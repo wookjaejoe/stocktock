@@ -1,0 +1,10 @@
+pypiwin32
+pywin32
+PyQt5
+matplotlib
+pandas
+pandas_datareader
+slack_sdk
+rx
+schedule
+pymongo[srv]
