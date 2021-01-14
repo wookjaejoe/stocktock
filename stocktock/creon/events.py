@@ -72,6 +72,7 @@ class MarketEvent(JsonSerializable):
     code: str = None  # 종목 코드
     name: str = None  # 종목명
     category: int = None  # 항목 구분
+    category_name: str = None  # 항목 구분 이름
     contents: str = None  # 내용
 
     def __eq__(self, other):
@@ -95,14 +96,22 @@ def get_events():
         def convert_datetime(dt: int):
             hour = int(dt / 100)
             minute = dt % 100
-            return datetime(year=now.year, month=now.month, day=now.day, hour=hour, minute=minute, second=0)
 
+            return datetime(year=now.year,
+                            month=now.month,
+                            day=now.day - 1 if dt > now.hour * 100 + now.minute else now.day,
+                            hour=hour,
+                            minute=minute,
+                            second=0)
+
+        category = client.GetDataValue(3, i)
         evt = MarketEvent(
             _id=uuid4(),
             datetime=convert_datetime(client.GetDataValue(0, i)),
             code=client.GetDataValue(1, i),
             name=client.GetDataValue(2, i),
-            category=client.GetDataValue(3, i),
+            category=category,
+            category_name=CATEGORIES.get(category),
             contents=client.GetDataValue(4, i)
         )
 
