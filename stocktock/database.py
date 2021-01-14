@@ -10,3 +10,8 @@ class DbManager:
     @classmethod
     def get_events(cls):
         return cls.db.events
+
+    @classmethod
+    def get_event_categories(cls):
+        return cls.db.event_categories
+
