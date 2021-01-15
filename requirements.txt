@@ -8,3 +8,4 @@ slack_sdk
 rx
 schedule
 pymongo[srv]
+pywinauto

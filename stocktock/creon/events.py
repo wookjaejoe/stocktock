@@ -2,7 +2,6 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from queue import Queue
 from typing import *
 from uuid import uuid4, UUID
 
@@ -22,7 +21,8 @@ class EventCategory(JsonSerializable):
 @dataclass
 class Event(JsonSerializable):
     _id: UUID = None
-    datetime: datetime = None  # 시간
+    time: int = None  # 뉴스 시각
+    created: datetime = datetime.now()  # 데이터 생성 시간
     code: str = None  # 종목 코드
     name: str = None  # 종목명
     category_id: int = None  # 항목 구분
@@ -44,22 +44,9 @@ def get_events():
     count = client.GetHeaderValue(2)  # 수신개수(short)
     events = []
     for i in range(count):
-        now = datetime.now()
-
-        def convert_datetime(dt: int):
-            hour = int(dt / 100)
-            minute = dt % 100
-
-            return datetime(year=now.year,
-                            month=now.month,
-                            day=now.day - 1 if dt > now.hour * 100 + now.minute else now.day,
-                            hour=hour,
-                            minute=minute,
-                            second=0)
-
         evt = Event(
             _id=uuid4(),
-            datetime=convert_datetime(client.GetDataValue(0, i)),
+            time=client.GetDataValue(0, i),
             code=client.GetDataValue(1, i),
             name=client.GetDataValue(2, i),
             category_id=client.GetDataValue(3, i),
@@ -71,12 +58,24 @@ def get_events():
     return events
 
 
+class EventCache:
+    def __init__(self, maxsize):
+        self.maxsize = maxsize
+        self.items = []
+
+    def put(self, event: Event):
+        if len(self.items) >= self.maxsize:
+            self.items.pop(0)
+
+        self.items.append(event)
+
+
 class EventBroker:
     CACHE_SIZE = 1000
     REQ_INTERVAL = 10
 
     def __init__(self):
-        self.cache = Queue(maxsize=self.CACHE_SIZE)
+        self.cache = EventCache(self.CACHE_SIZE)
         self.subscribers: List[Callable[[List[Event]], None]] = []
         self.stopped = True
 
@@ -85,7 +84,7 @@ class EventBroker:
             self.cache.put(event)
 
     def collect(self):
-        event_list = [evt for evt in get_events() if evt not in self.cache.queue]
+        event_list = [evt for evt in get_events() if evt not in self.cache.items]
         if not event_list:
             return
 
