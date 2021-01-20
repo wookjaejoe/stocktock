@@ -38,7 +38,7 @@ def _create_stream_handler(level=logging.INFO):
 
 def _create_file_handler(level=logging.DEBUG):
     file_handler = logging.handlers.RotatingFileHandler(
-        filename='stocktock.log',
+        filename=os.path.join(LOG_FOLDER, 'stocktock.log'),
         encoding='utf-8',
         maxBytes=4 * 1024 * 1024,
         backupCount=2)

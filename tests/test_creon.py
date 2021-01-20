@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir, 'stocktock'))
 
-from creon import stocks, charts, events
+from creon import stocks, charts, _events
 
 SAMSUNG_CODE = 'A005930'
 
@@ -36,8 +36,8 @@ class TestCases(unittest.TestCase):
         )
 
     def test_event(self):
-        events.subscribe()
-        evt_list = events.get_events()
+        _events.subscribe()
+        evt_list = _events.get_events()
         print()
 
 if __name__ == '__main__':
