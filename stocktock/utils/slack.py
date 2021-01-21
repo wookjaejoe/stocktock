@@ -4,6 +4,8 @@ from __future__ import annotations
 __author__ = 'wookjae.jo'
 
 import logging
+import socket
+import threading
 from dataclasses import dataclass
 
 from slack_sdk import WebClient
@@ -30,33 +32,26 @@ class File(Sendable):
 
 
 class SlackApp:
-    def __init__(self, token, channels):
+    def __init__(self, token, channel):
         self.token = token
         self.client = WebClient(token=token)
-        self.channels = channels
+        self.channel = channel
+        self.queue = []
 
-    def send(self, *sendables: Sendable):
-        """
-        Send some sendables to all channels
-        """
-        for channel in self.channels:
-            response = self._send_to(channel=channel, sendable=sendables[0])
-            ts = response.data.get(STR_TS)
-            if len(sendables) > 1:
-                for sendable in sendables[1:]:
-                    self._send_to(channel=channel,
-                                  sendable=sendable,
-                                  ts=ts)
+    def consume_message(self):
+        while True:
+            if self.queue:
+                sendable = self.queue.pop()
 
-    def _send_to(self, channel: str, sendable: Sendable, ts=None):
+    def send(self, sendable: Sendable, ts=None):
         if isinstance(sendable, Message):
             response = self.client.chat_postMessage(
-                channel=channel,
+                channel=self.channel,
                 text=sendable.text,
                 thread_ts=ts)
         elif isinstance(sendable, File):
             response = self.client.files_upload(
-                channels=channel,
+                channels=self.channel,
                 initial_comment=sendable.comment,
                 file=sendable.path,
                 thread_ts=ts,
@@ -64,17 +59,27 @@ class SlackApp:
         else:
             raise RuntimeError(f'Not supported sendable type: {type(sendable)}')
 
-        assert response.status_code == 200, f'Failed to send a message to {channel}\n{response}'
-        return response
+        assert response.status_code == 200, f'Failed to send a message to {self.channel}\n{response}'
+        return response.data.get('ts')
 
-class _Warren(SlackApp):
-    DEFAULT_CHANNELS = ['#control-tower']
 
-    def __init__(self, channels: list = None):
-        if not channels:
-            channels = self.DEFAULT_CHANNELS
+class Warren(SlackApp):
+
+    def __init__(self):
         super().__init__(token='xoxb-1605364850897-1622524239648-QxvKygr0ynO4cZQXhUkGUN01',
-                         channels=channels)
+                         channel='#control-tower')
 
 
-warren = _Warren()
+class WarrenSession(Warren):
+
+    def __init__(self):
+        super().__init__()
+        hostname = socket.gethostname()
+        host = socket.gethostbyname(hostname)
+        self.ts = super(WarrenSession, self).send(Message(f'SESSION CONNECTED - {hostname}({host})'))
+
+    def send(self, sendable: Sendable, ts=None):
+        threading.Thread(target=lambda: super(WarrenSession, self).send(sendable, self.ts)).start()
+
+
+warren_session = WarrenSession()

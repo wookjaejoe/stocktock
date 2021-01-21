@@ -51,5 +51,10 @@ def callback(event: events.Event):
         trader.request_order(order)
 
 
-events.subscribe(callback)
-events.start()
+def main():
+    events.subscribe(callback)
+    events.start()
+
+
+if __name__ == '__main__':
+    main()

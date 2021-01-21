@@ -7,14 +7,15 @@ from typing import *
 
 import win32com.client
 
+from creon import stocks
+from creon import stocks
+from utils.slack import warren_session, Message
+
 td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
 stock_mst = win32com.client.Dispatch('DsCbo1.StockMst')
-init_code = td_util.TradeInit()
-
 objCpCodeMgr = win32com.client.Dispatch("CpUtil.CpCodeMgr")
-codeList = objCpCodeMgr.GetStockListByMarket(1)  # 거래소
-codeList2 = objCpCodeMgr.GetStockListByMarket(2)  # 코스닥
-
+init_code = td_util.TradeInit()
+all_stocks = stocks.get_all(stocks.MarketType.EXCHANGE) + stocks.get_all(stocks.MarketType.KOSDAQ)
 init_codes = {
     -1: '오류',
     0: '정상',
@@ -36,6 +37,7 @@ class Order:
     order_type: OrderType
     code: str
     count: int
+    magic_value: any = None
 
 
 assert init_code == 0, init_codes.get(init_code)
@@ -89,6 +91,7 @@ def _buy(code: str, count: int):
            code=code,
            price=price,
            count=count)
+    return price
 
 
 def _sell(code: str, count: int):
@@ -98,6 +101,7 @@ def _sell(code: str, count: int):
            code=code,
            price=price,
            count=count)
+    return price
 
 
 # 예약 주문 내역 조회 및 미체결 리스트 구하기
@@ -151,9 +155,27 @@ class Trader:
                 order = self.queue.pop()
                 try:
                     if order.order_type == OrderType.BUY:
-                        _buy(order.code, order.count)
+                        price = _buy(order.code, order.count)
                     elif order.order_type == OrderType.SELL:
-                        _sell(order.code, order.count)
+                        price = _sell(order.code, order.count)
+                    else:
+                        return
+
+                    # 매수/매도, 종목코드, 종목명, 개수, 가격?
+
+                    str_order = Message(
+                        ', '.join(
+                            [
+                                order.order_type.name,
+                                order.code,
+                                stocks.get_detail(order.code).name,
+                                str(price)
+                            ]
+                        )
+                    )
+                    str_magic_value = str(order.magic_value)
+                    msg = '\n'.join([str_order, str_magic_value])
+                    warren_session.send(msg)
                 except BaseException as e:
                     logging.warning(e)
             else:
