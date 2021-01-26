@@ -9,3 +9,4 @@ rx
 schedule
 pymongo[srv]
 pywinauto
+pykiwoom
