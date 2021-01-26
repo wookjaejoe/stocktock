@@ -8,8 +8,8 @@ from typing import *
 import win32com.client
 
 from creon import stocks
-from creon import stocks
 from utils.slack import warren_session, Message
+from . import events
 
 td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
 stock_mst = win32com.client.Dispatch('DsCbo1.StockMst')
@@ -140,6 +140,14 @@ def order_list():
             break
 
 
+def get_stock_name(code: str):
+    for stock in all_stocks:
+        if stock.code == code:
+            return stock.name
+
+    return None
+
+
 class Trader:
 
     def __init__(self):
@@ -163,19 +171,31 @@ class Trader:
 
                     # 매수/매도, 종목코드, 종목명, 개수, 가격?
 
-                    str_order = Message(
-                        ', '.join(
-                            [
-                                order.order_type.name,
-                                order.code,
-                                stocks.get_detail(order.code).name,
-                                str(price)
-                            ]
-                        )
+                    str_order = ', '.join(
+                        [
+                            order.order_type.name,
+                            order.code,
+                            stocks.get_detail(order.code).name,
+                            str(price)
+                        ]
                     )
                     str_magic_value = str(order.magic_value)
-                    msg = '\n'.join([str_order, str_magic_value])
+                    msg = Message('\n'.join([str_order, str_magic_value]))
                     warren_session.send(msg)
+
+                    if isinstance(order.magic_value, events.Event):
+                        lg = [
+                            order.order_type.value,
+                            order.code,
+                            get_stock_name(order.code),
+                            price,
+                            order.magic_value.category,
+                            order.magic_value.cancel,
+                            order.magic_value.time
+                        ]
+                        logging.critical(', '.join([str(v) for v in lg]))
+                    else:
+                        logging.error(f'NOT SUPPORTED LOGGING FORMAT: {order.magic_value}')
                 except BaseException as e:
                     logging.warning(e)
             else:
