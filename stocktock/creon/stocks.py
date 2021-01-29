@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import *
-
+from retry import retry
 from .com import *
 
 
@@ -81,9 +81,20 @@ def get_all(market_type: MarketType) -> List[Stock]:
     return result
 
 
+ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
+
+
+def get_name(code: str):
+    for stock in ALL_STOCKS:
+        if code == stock.code:
+            return stock.name
+
+    return get_detail(code).name
+
+@retry(tries=3, delay=1)
 def get_detail(code: str) -> StockDetail:
     # 현재가 객체 구하기
-    stockmst.SetInputValue(0, code)  # 종목 코드 - 삼성전자
+    stockmst.SetInputValue(0, code)
     stockmst.BlockRequest()
     req_status = stockmst.GetDibStatus()
     req_msg = stockmst.GetDibMsg1()
@@ -101,8 +112,8 @@ def get_detail(code: str) -> StockDetail:
         open=stockmst.GetHeaderValue(13),  # 시가
         high=stockmst.GetHeaderValue(14),  # 고가
         low=stockmst.GetHeaderValue(15),  # 저가
-        offer=stockmst.GetHeaderValue(16),  # 매도호가
-        bid=stockmst.GetHeaderValue(17),  # 매수호가
+        offer=stockmst.GetHeaderValue(16),  # 매도호가 - 셀러가 팔고 싶은 가격
+        bid=stockmst.GetHeaderValue(17),  # 매수호가 - 구매자가 사고 싶은 가격
         vol=stockmst.GetHeaderValue(18),  # 거래량
         vol_value=stockmst.GetHeaderValue(19),  # 거래대금
 
@@ -163,6 +174,7 @@ class CpEvent:
 
         self.on_received(time, timess, ex_flag, cprice, diff, c_vol, vol)
 
+
 class StockSubscriber:
     """
     https://money2.creontrade.com/e5/mboard/ptype_basic/plusPDS/DW_Basic_Read.aspx?boardseq=299&seq=43&page=3&searchString=&prd=&lang=7&p=8833&v=8639&m=9505
@@ -174,7 +186,7 @@ class StockSubscriber:
         self.stockcur = new_stockcur()
 
     def subscribe(self, on_received):
-        handler  = win32com.client.WithEvents(self.stockcur, CpEvent(self.stockcur, on_received))
+        handler = win32com.client.WithEvents(self.stockcur, CpEvent(self.stockcur, on_received))
         self.stockcur.SetInputValue(0, self.code)
         handler.set_params(self.stockcur)
         self.stockcur.Subscribe()

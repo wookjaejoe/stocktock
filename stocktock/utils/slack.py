@@ -14,6 +14,7 @@ logger = logging.getLogger('notification')
 logger.setLevel(logging.INFO)
 
 STR_TS = 'ts'
+enable = True
 
 
 class Sendable:
@@ -80,6 +81,3 @@ class WarrenSession(Warren):
 
     def send(self, sendable: Sendable, ts=None):
         threading.Thread(target=lambda: super(WarrenSession, self).send(sendable, self.ts)).start()
-
-
-warren_session = WarrenSession()

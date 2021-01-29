@@ -10,8 +10,8 @@ from . import com, stocks
 
 
 CREON_PATH = 'C:\CREON\STARTER\coStarter.exe'
-CREON_ID = 'WJJO3'
-PWD = 'dnrwo1'
+CREON_ID = 'WJJO'
+PWD = 'dnrwo1!'
 PWD_CERT = 'Whdnrwo1!!'
 
 
@@ -50,6 +50,8 @@ def connect():
 
 
 # todo: 실전 투자에서 활성화
-# connect()
+if not com.cybos.IsConnect:
+    connect()
+
 assert com.cybos.IsConnect, 'Disconnected'
 assert ctypes.windll.shell32.IsUserAnAdmin(), 'Not administrator'

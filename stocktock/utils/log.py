@@ -5,6 +5,7 @@ import logging
 import logging.handlers
 import os
 import sys
+from datetime import datetime
 
 __debug = False
 
@@ -37,8 +38,9 @@ def _create_stream_handler(level=logging.INFO):
 
 
 def _create_file_handler(level=logging.DEBUG):
+    date = datetime.now().strftime('%Y%m%d')
     file_handler = logging.handlers.RotatingFileHandler(
-        filename=os.path.join(LOG_FOLDER, 'stocktock.log'),
+        filename=os.path.join(LOG_FOLDER, f'stocktock-{date}.log'),
         encoding='utf-8',
         maxBytes=4 * 1024 * 1024,
         backupCount=2)

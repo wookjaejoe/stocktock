@@ -2,27 +2,38 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import *
 
 import win32com.client
 
 from creon import stocks
-from utils.slack import warren_session, Message
-from . import events
+from utils.slack import WarrenSession
 
-td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
-stock_mst = win32com.client.Dispatch('DsCbo1.StockMst')
-objCpCodeMgr = win32com.client.Dispatch("CpUtil.CpCodeMgr")
-init_code = td_util.TradeInit()
+warren_enabled = False
+
+if warren_enabled:
+    warren_session = WarrenSession()
+
 all_stocks = stocks.get_all(stocks.MarketType.EXCHANGE) + stocks.get_all(stocks.MarketType.KOSDAQ)
-init_codes = {
-    -1: '오류',
-    0: '정상',
-    1: '업무 키 입력 잘못 됨',
-    2: '계좌 비밀 번호 입력 잘못 됨',
-    3: '취소'
-}
+td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
+
+
+def init():
+    init_code = td_util.TradeInit()
+    init_codes = {
+        -1: '오류',
+        0: '정상',
+        1: '업무 키 입력 잘못 됨',
+        2: '계좌 비밀 번호 입력 잘못 됨',
+        3: '취소'
+    }
+    assert init_code == 0, init_codes.get(init_code)
+    print(init_code)
+
+
+init()
 
 
 # enum 주문 상태 세팅용
@@ -37,23 +48,34 @@ class Order:
     order_type: OrderType
     code: str
     count: int
-    magic_value: any = None
 
 
-assert init_code == 0, init_codes.get(init_code)
+@dataclass(init=False)
+class VirtualOrder:
+    created: datetime
+    code: str
+    order_type: OrderType
+    order_price: int
+    order_count: int
+    total_price: int
 
+    def __init__(self, code: str, order_type: OrderType, limit=0, count=0):
+        self.code = code
+        self.order_type = order_type
+        self.created = datetime.now()
 
-def get_price(code):
-    stock_mst.SetInputValue(0, code)
-    ret = stock_mst.BlockRequest()
+        detail = stocks.get_detail(code)
+        if order_type == OrderType.BUY:
+            self.order_price = detail.offer
+        elif order_type == OrderType.SELL:
+            self.order_price = detail.bid
 
-    sells = []
-    buys = []
-    for i in range(10):
-        sells.append(stock_mst.GetDataValue(0, i))  # 매도호가
-        buys.append(stock_mst.GetDataValue(1, i))  # 매수호가
+        if count:
+            self.order_count = count
+        elif limit:
+            self.order_count = int(limit / self.order_price)
 
-    return sells, buys
+        self.total_price = self.order_price * self.order_count
 
 
 def _order(order_type: OrderType, code: str, price: int, count: int):
@@ -85,8 +107,7 @@ def _order(order_type: OrderType, code: str, price: int, count: int):
 
 
 def _buy(code: str, count: int):
-    sells, _ = get_price(code)
-    price = min(sells)
+    price = stocks.get_detail(code).offer
     _order(order_type=OrderType.BUY,
            code=code,
            price=price,
@@ -95,8 +116,7 @@ def _buy(code: str, count: int):
 
 
 def _sell(code: str, count: int):
-    _, buys = get_price(code)
-    price = max(buys)
+    price = stocks.get_detail(code).bid
     _order(order_type=OrderType.SELL,
            code=code,
            price=price,
@@ -168,34 +188,6 @@ class Trader:
                         price = _sell(order.code, order.count)
                     else:
                         return
-
-                    # 매수/매도, 종목코드, 종목명, 개수, 가격?
-
-                    str_order = ', '.join(
-                        [
-                            order.order_type.name,
-                            order.code,
-                            stocks.get_detail(order.code).name,
-                            str(price)
-                        ]
-                    )
-                    str_magic_value = str(order.magic_value)
-                    msg = Message('\n'.join([str_order, str_magic_value]))
-                    warren_session.send(msg)
-
-                    if isinstance(order.magic_value, events.Event):
-                        lg = [
-                            order.order_type.value,
-                            order.code,
-                            get_stock_name(order.code),
-                            price,
-                            order.magic_value.category,
-                            order.magic_value.cancel,
-                            order.magic_value.time
-                        ]
-                        logging.critical(', '.join([str(v) for v in lg]))
-                    else:
-                        logging.error(f'NOT SUPPORTED LOGGING FORMAT: {order.magic_value}')
                 except BaseException as e:
                     logging.warning(e)
             else:

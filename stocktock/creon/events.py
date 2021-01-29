@@ -1,16 +1,8 @@
-import ctypes
 import sys
 from dataclasses import dataclass
 
 import win32com.client
 from PyQt5.QtWidgets import *
-
-g_objCodeMgr = win32com.client.Dispatch('CpUtil.CpCodeMgr')
-g_objCpStatus = win32com.client.Dispatch('CpUtil.CpCybos')
-g_objCpTrade = win32com.client.Dispatch('CpTrade.CpTdUtil')
-
-assert ctypes.windll.shell32.IsUserAnAdmin(), '관리자 권한 필요'
-assert g_objCpStatus.IsConnect != 0, 'CREON+ 연결 실패'
 
 subscribers = []
 
@@ -30,6 +22,7 @@ def publish(category: int, code: str, time: int, cancel: bool):
 
 # CpEvent: 실시간 이벤트 수신 클래스
 class CpEvent:
+    # noinspection PyAttributeOutsideInit
     def set_params(self, client, name, caller):
         self.client = client  # CP 실시간 통신 object
         self.name = name  # 서비스가 다른 이벤트를 구분하기 위한 이름
@@ -142,6 +135,3 @@ def start():
     app = QApplication(sys.argv)
     MyWindow()
     app.exec_()
-
-
-
