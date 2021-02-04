@@ -13,21 +13,21 @@ DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_FOLDER = os.path.abspath('logs')
 os.makedirs(LOG_FOLDER, exist_ok=True)
 
-LOG_FORMAT_DETAILS = '[%(asctime)s] [%(levelname)-8s] %(message)s'
+LOG_FORMAT_DETAILS = '%(asctime)s, %(levelname)-8s, %(message)s'
 
 
 class ConsoleLogFormatter(logging.Formatter):
     def __init__(self):
         # noinspection SpellCheckingInspection
         logging.Formatter.__init__(self,
-                                   fmt=LOG_FORMAT_DETAILS)
+                                   fmt=LOG_FORMAT_DETAILS, datefmt=DATE_FORMAT)
 
 
 class FileLogFormatter(logging.Formatter):
     def __init__(self):
         # noinspection SpellCheckingInspection
         logging.Formatter.__init__(self,
-                                   fmt=LOG_FORMAT_DETAILS)
+                                   fmt=LOG_FORMAT_DETAILS, datefmt=DATE_FORMAT)
 
 
 def _create_stream_handler(level=logging.INFO):

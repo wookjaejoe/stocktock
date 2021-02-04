@@ -7,7 +7,7 @@ sys.path.append(os.path.join(basedir, 'stocktock'))
 import csv
 import time
 import threading
-
+from utils import calc
 from creon import events, traders, stocks
 from utils import log
 import logging
@@ -84,9 +84,74 @@ class Wallet:
 wallet = Wallet()
 
 
+@dataclass(init=False)
+class Record:
+    what: str
+    order_type: str
+    code: str
+    name: str
+    order_price: int
+    order_count: int
+    total: int
+    earning_rate: float = 0
+    earning_price: int = 0
+    capital: int = 0
+
+    def __init__(self, what, order_type: traders.OrderType, code, order_price, order_count):
+        self.what = what
+        self.order_type = order_type.name
+        self.code = code
+        self.name = stocks.get_name(code)
+        self.order_price = order_price
+        self.order_count = order_count
+        self.total = order_price * order_count
+        self.capital = stocks.get_capital(code)
+
+        if order_type == traders.OrderType.SELL:
+            holding = wallet.get(code)
+            self.earning_rate = calc.earnings_ratio(buy_price=holding.price, sell_price=order_price)
+            self.earning_price = self.total - holding.price * holding.count
+            wallet.delete(code)
+        elif order_type == traders.OrderType.BUY:
+            wallet.put(Holding(code=code, count=order_count, price=order_price))
+
+    def summit(self):
+        logging.critical(', '.join([str(v) for v in list(self.__dict__.values())]))
+
+
+not_handling_words = [
+    'TIGER',
+    'KOSEF',
+    'KODEX',
+    'ARIRANG',
+    'HANARO',
+    'KBSTAR',
+    'KINDEX',
+    'TREX'
+]
+
+
 def callback(event: events.Event):
     if event.cancel:
+        # 이벤트 취소 대응 안함
         return
+
+    if not stocks.is_kos(event.code):
+        # KOSPI, KOSDAQ 아니면 취급 안함
+        return
+
+    if stocks.get_supervision(event.code) == 1:
+        # 관리 종목 취급 안함
+        return
+
+    if stocks.get_status(event.code) != 0:
+        # 정상 아닌 종목 취급 안함
+        return
+
+    stock_name = stocks.get_name(event.code)
+    for not_handling_word in not_handling_words:
+        if not_handling_word in stock_name:
+            return
 
     if event.category in [45, 46]:
         order = on_45_46(event)
@@ -96,24 +161,13 @@ def callback(event: events.Event):
         return
 
     if order:
-        record = [
-            event.category,
-            # 주문 타입, 주문 종목, 주문 종목명, 주문가, 주문 개수
-            order.order_type.name, order.code, stocks.get_name(order.code), order.order_price, order.order_count,
-            order.total_price
-        ]
-
-        if order.order_type == traders.OrderType.SELL:
-            holding = wallet.get(event.code)
-            return_price = order.total_price - holding.price * holding.count
-            return_rate = (order.total_price / holding.price * holding.count) - 1 * 100
-            record.append(return_rate)
-            record.append(return_price)
-            wallet.delete(order.code)
-        elif order.order_type == traders.OrderType.BUY:
-            wallet.put(Holding(code=order.code, count=order.order_count, price=order.order_price))
-
-        logging.critical(', '.join([str(v) for v in record]))
+        Record(
+            what=event.category,
+            order_type=order.order_type,
+            code=event.code,
+            order_price=order.order_price,
+            order_count=order.order_count
+        ).summit()
 
 
 def on_45_46(event: events.Event) -> traders.VirtualOrder:
@@ -130,34 +184,65 @@ def on_44_47(event: events.Event) -> traders.VirtualOrder:
                                     count=wallet.get(event.code).count)
 
 
-def on_watch_10sec():
+STOP_LINE = -5
+
+
+def check_stop_line():
+    details: Dict[str, stocks.StockDetail2] = {
+        detail.code: detail for detail in
+        stocks.get_details([holding.code for holding in wallet.holdings])
+    }
+
     for holding in wallet.holdings:
         try:
-            cur_price = stocks.get_detail(holding.code).cprice
+            cur_price = details.get(holding.code).price
+            earnings_rate = calc.earnings_ratio(holding.price, cur_price)
+
+            if earnings_rate < STOP_LINE:
+                Record(
+                    what=f'손절라인 {STOP_LINE}%',
+                    order_type=traders.OrderType.SELL,
+                    code=holding.code,
+                    order_price=cur_price,
+                    order_count=holding.count
+                ).summit()
         except:
             logging.warning(f'Failed to get expected price for {holding.code}')
-            continue
-
-        return_rate = (cur_price / holding.price - 1) * 100
-        if return_rate < -3:
-            wallet.delete(holding.code)
-
-        time.sleep(0.05)
 
 
-def watch_10sec():
-    schedule.every(15).seconds.do(on_watch_10sec)
+def start_scheduling():
+    # 손절라인 체크
+    schedule.every(15).seconds.do(check_stop_line)
 
     def do_schedule():
         while True:
             schedule.run_pending()
             time.sleep(1)
 
-    threading.Thread(target=do_schedule).start()
+    threading.Thread(target=do_schedule, daemon=True).start()
+
+
+def check_jumping():
+    # 장전매수/시가매매 - https://hwiiiii.tistory.com/entry/%EC%A3%BC%EC%8B%9D-%EC%A2%85%EA%B0%80-%EC%8B%9C%EA%B0%80%EB%9E%80-%EA%B0%AD-%EB%A7%A4%EB%A7%A4%EC%97%90-%EB%8C%80%ED%95%B4
+
+    def run():
+        details = stocks.get_details([stock.code for stock in stocks.ALL_STOCKS if stocks.get_status(stock.code) == 0])
+        for detail in details:
+            if detail.yesterday_close * 1.02 <= detail.open:
+                Record(
+                    what=f'갭상승 2%',
+                    order_type=traders.OrderType.BUY,
+                    code=detail.code,
+                    order_price=detail.price,
+                    order_count=int(100_0000 / detail.price)
+                ).summit()
+
+    threading.Thread(target=run).start()
 
 
 def main():
-    watch_10sec()
+    check_jumping()
+    start_scheduling()
     events.subscribe(callback)
     events.start()
 

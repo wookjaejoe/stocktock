@@ -80,4 +80,4 @@ class WarrenSession(Warren):
         self.ts = super(WarrenSession, self).send(Message(f'SESSION CONNECTED - {hostname}({host})'))
 
     def send(self, sendable: Sendable, ts=None):
-        threading.Thread(target=lambda: super(WarrenSession, self).send(sendable, self.ts)).start()
+        threading.Thread(target=lambda: super(WarrenSession, self).send(sendable, self.ts), daemon=True).start()

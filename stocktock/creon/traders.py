@@ -30,7 +30,6 @@ def init():
         3: '취소'
     }
     assert init_code == 0, init_codes.get(init_code)
-    print(init_code)
 
 
 init()
@@ -172,7 +171,7 @@ class Trader:
 
     def __init__(self):
         self.queue: List[Order] = []
-        threading.Thread(target=self.start_consume).start()
+        threading.Thread(target=self.start_consume, daemon=True).start()
 
     def request_order(self, order: Order):
         self.queue.append(order)

@@ -1,11 +1,7 @@
 from dataclasses import dataclass
-from enum import Enum
-from typing import *
-from retry import retry
+
 from .com import *
 
-
-# todo: 방어 with request retry
 
 class MarketType(Enum):
     EXCHANGE = 1  # 거래소
@@ -53,6 +49,27 @@ class StockDetail:
     exDiff: any  # 예상체결가 전일대비
     exVol: any  # 예상체결수량
 
+    arg_65: any
+    arg_66: any
+    arg_67: any
+    arg_68: any
+
+
+@dataclass
+class StockDetailShort:
+    code: str
+    name: str
+    margin: int
+    margin_code: int  # 1: 상한, 2: 상승, 3: 보합, 4: 하한, 5: 하락, 6: 기세상한, 7: 기세상승, 8: 기세하한, 9: 기세하락
+    current: int
+    bid: int  # 매수호가
+    ask: int  # 매도호가
+    volumn: int  # 거래량
+    market: int  # 장 구분 - '0': 동시호가와 장중이외의 시간, '1': 동시호가시간(예상체결가 들어오는 시간), '2': 장중
+    expected_conclusion_price: int  # 예상 체결가
+    expected_volumn: int  # 예상 체결 수량
+    expected_conclusion_price_margin: int  # 예상 체결가 전일 대비
+
 
 @dataclass
 class StockTrend:
@@ -66,14 +83,16 @@ class StockTrend:
 
 
 def get_all(market_type: MarketType) -> List[Stock]:
+    _codemgr = codemgr()
+
     result = []
-    for code in codemgr.GetStockListByMarket(market_type.value):
+    for code in _codemgr.GetStockListByMarket(market_type.value):
         stock = Stock(
             market_type=market_type,
             code=code,
-            secondCode=codemgr.GetStockSectionKind(code),
-            name=codemgr.CodeToName(code),
-            stdPrice=codemgr.GetStockStdPrice(code)
+            secondCode=_codemgr.GetStockSectionKind(code),
+            name=_codemgr.CodeToName(code),
+            stdPrice=_codemgr.GetStockStdPrice(code)
         )
 
         result.append(stock)
@@ -85,46 +104,192 @@ ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 
 
 def get_name(code: str):
+    _stockcode = stockcode()
+
     for stock in ALL_STOCKS:
         if code == stock.code:
             return stock.name
 
-    return get_detail(code).name
+    return _stockcode.CodeToName(code)
 
-@retry(tries=3, delay=1)
+
+def is_kos(code):
+    """
+    Is kospi | kosdaq?
+    """
+    for stock in ALL_STOCKS:
+        if code == stock.code:
+            return True
+
+    return False
+
+
+@limit_safe(ReqType.NON_TRADE)
 def get_detail(code: str) -> StockDetail:
+    _stockmst = stockcode()
+
     # 현재가 객체 구하기
-    stockmst.SetInputValue(0, code)
-    stockmst.BlockRequest()
-    req_status = stockmst.GetDibStatus()
-    req_msg = stockmst.GetDibMsg1()
+    _stockmst.SetInputValue(0, code)
+    _stockmst.BlockRequest()
+    req_status = _stockmst.GetDibStatus()
+    req_msg = _stockmst.GetDibMsg1()
     assert req_status == 0, f'Request Failure: ({req_status}) {req_msg}'
 
     # todo: 헤더 훨씬 많음
     # http://cybosplus.github.io/cpdib_rtf_1_/stockmst.htm
     return StockDetail(
         # 현재가 정보 조회
-        code=stockmst.GetHeaderValue(0),  # 종목코드
-        name=stockmst.GetHeaderValue(1),  # 종목명
-        time=stockmst.GetHeaderValue(4),  # 시간
-        cprice=stockmst.GetHeaderValue(11),  # 종가
-        diff=stockmst.GetHeaderValue(12),  # 대비
-        open=stockmst.GetHeaderValue(13),  # 시가
-        high=stockmst.GetHeaderValue(14),  # 고가
-        low=stockmst.GetHeaderValue(15),  # 저가
-        offer=stockmst.GetHeaderValue(16),  # 매도호가 - 셀러가 팔고 싶은 가격
-        bid=stockmst.GetHeaderValue(17),  # 매수호가 - 구매자가 사고 싶은 가격
-        vol=stockmst.GetHeaderValue(18),  # 거래량
-        vol_value=stockmst.GetHeaderValue(19),  # 거래대금
+        code=_stockmst.GetHeaderValue(0),  # 종목코드
+        name=_stockmst.GetHeaderValue(1),  # 종목명
+        time=_stockmst.GetHeaderValue(4),  # 시간
+        cprice=_stockmst.GetHeaderValue(11),  # 종가
+        diff=_stockmst.GetHeaderValue(12),  # 대비
+        open=_stockmst.GetHeaderValue(13),  # 시가
+        high=_stockmst.GetHeaderValue(14),  # 고가
+        low=_stockmst.GetHeaderValue(15),  # 저가
+        offer=_stockmst.GetHeaderValue(16),  # 매도호가 - 셀러가 팔고 싶은 가격
+        bid=_stockmst.GetHeaderValue(17),  # 매수호가 - 구매자가 사고 싶은 가격
+        vol=_stockmst.GetHeaderValue(18),  # 거래량
+        vol_value=_stockmst.GetHeaderValue(19),  # 거래대금
 
         # 예상 체결관련 정보
-        exFlag=ExpectedFlag(stockmst.GetHeaderValue(58)),  # 예상체결가 구분 플래그
-        exPrice=stockmst.GetHeaderValue(55),  # 예상체결가
-        exDiff=stockmst.GetHeaderValue(56),  # 예상체결가 전일대비
-        exVol=stockmst.GetHeaderValue(57),  # 예상체결수량
+        exFlag=ExpectedFlag(_stockmst.GetHeaderValue(58)),  # 예상체결가 구분 플래그
+        exPrice=_stockmst.GetHeaderValue(55),  # 예상체결가
+        exDiff=_stockmst.GetHeaderValue(56),  # 예상체결가 전일대비
+        exVol=_stockmst.GetHeaderValue(57),  # 예상체결수량
+
+        arg_65=_stockmst.GetHeaderValue(65),
+        arg_66=_stockmst.GetHeaderValue(66),
+        arg_67=_stockmst.GetHeaderValue(67),
+        arg_68=_stockmst.GetHeaderValue(68),
     )
 
 
+@dataclass
+class StockDetail2:
+    code: str  # 종목 코드
+    name: str  # 종목명
+    time: int  # 시간(HHMM)
+    price: int  # 현재가
+    margin: int  # 전일대비
+    status: int  # 상태구분
+    # '1': 상한
+    # '2':상승
+    # '3':보합
+    # '4':하한
+    # '5':하락
+    # '6':기세상한
+    # '7':기세상승
+    # '8':기세하한
+    # '9':기세하락
+
+    open: int  # 시가
+    high: int  # 고가
+    low: int  # 저가
+    ask: int  # 매도호가
+    bid: int  # 매수호가
+    volumn_week: int  # 거래량 [주의] 단위 1주
+    transaction: int  # 거래대금 [주의] 단위 천원
+    total_selling_balance: int  # 총매도잔량
+    total_buying_balance: int  # 총매수잔량
+    selling_balance: int  # 매도잔량
+    buying_balance: int  # 매수잔량
+    shared_number: int  # 상장주식수
+    foreign_ownership_ratio: int  # 외국인보유비율(%)
+    yesterday_close: int  # 전일종가
+    yesterday_volumn: int  # 전일거래량
+    strength: int  # 체결강도
+    field_22: int  # 순간체결량
+    field_23: int  # 체결가비교 Flag
+    # 'O':매도
+    # 'B':매수
+
+    field_24: int  # 호가비교 Flag
+    # 'O':매도
+    # 'B':매수
+
+    field_25: int  # 동시호가구분
+    # '1':동시호가
+    # '2':장중
+
+    field_26: int  # 예상체결가
+    field_27: int  # 예상체결가 전일대비
+    field_28: int  # 예상체결가 상태구분
+    # '1':상한
+    # '2':상승
+    # '3':보합
+    # '4':하한
+    # '5':하락
+    # '6':기세상한
+    # '7':기세상승
+    # '8':기세하한
+    # '9':기세하락
+
+    field_29: int  # 예상체결가 거래량
+
+
+@limit_safe(req_type=ReqType.NON_TRADE)
+def get_details(stock_codes: List[str]):
+    def request(codes: List[str]):
+        _stockmst2 = stockmst2()
+        _stockmst2.SetInputValue(0, ','.join(codes))
+        _stockmst2.BlockRequest()
+        count = _stockmst2.GetHeaderValue(0)
+        result = []
+        for i in range(count):
+            result.append(StockDetail2(
+                code=_stockmst2.GetDataValue(0, i),
+                name=_stockmst2.GetDataValue(1, i),
+                time=_stockmst2.GetDataValue(2, i),
+                price=_stockmst2.GetDataValue(3, i),
+                margin=_stockmst2.GetDataValue(4, i),
+                status=_stockmst2.GetDataValue(5, i),
+                open=_stockmst2.GetDataValue(6, i),
+                high=_stockmst2.GetDataValue(7, i),
+                low=_stockmst2.GetDataValue(8, i),
+                ask=_stockmst2.GetDataValue(9, i),
+                bid=_stockmst2.GetDataValue(10, i),
+                volumn_week=_stockmst2.GetDataValue(11, i),
+                transaction=_stockmst2.GetDataValue(12, i),
+                total_selling_balance=_stockmst2.GetDataValue(13, i),
+                total_buying_balance=_stockmst2.GetDataValue(14, i),
+                selling_balance=_stockmst2.GetDataValue(15, i),
+                buying_balance=_stockmst2.GetDataValue(16, i),
+                shared_number=_stockmst2.GetDataValue(17, i),
+                foreign_ownership_ratio=_stockmst2.GetDataValue(18, i),
+                yesterday_close=_stockmst2.GetDataValue(19, i),
+                yesterday_volumn=_stockmst2.GetDataValue(20, i),
+                strength=_stockmst2.GetDataValue(21, i),
+                field_22=_stockmst2.GetDataValue(22, i),
+                field_23=_stockmst2.GetDataValue(23, i),
+                field_24=_stockmst2.GetDataValue(24, i),
+                field_25=_stockmst2.GetDataValue(25, i),
+                field_26=_stockmst2.GetDataValue(26, i),
+                field_27=_stockmst2.GetDataValue(27, i),
+                field_28=_stockmst2.GetDataValue(28, i),
+                field_29=_stockmst2.GetDataValue(29, i),
+            ))
+
+        return result
+
+    while stock_codes:
+        req_limit = 110
+        partial_codes = []
+        for _ in range(req_limit):
+            if stock_codes:
+                partial_codes.append(stock_codes.pop())
+            else:
+                break
+
+        for detail in request(partial_codes):
+            yield detail
+
+
+def get_yesterday_close(code: str):
+    return codemgr().GetStockYdClosePrice(code)
+
+
+@limit_safe(ReqType.NON_TRADE)
 def get_trend(code: str) -> Generator[StockTrend, None, None]:
     stockweek = win32com.client.Dispatch("DsCbo1.StockWeek")
     stockweek.SetInputValue(0, code)
@@ -148,48 +313,28 @@ def get_trend(code: str) -> Generator[StockTrend, None, None]:
         )
 
 
-class CpEvent:
+def get_supervision(code: str):
     """
-    https://money2.creontrade.com/e5/mboard/ptype_basic/plusPDS/DW_Basic_Read.aspx?boardseq=299&seq=43&page=3&searchString=&prd=&lang=7&p=8833&v=8639&m=9505
+    0: 일반종목
+    1: 관리
     """
-
-    def __init__(self, stockcur, on_received):
-        self.stockcur = stockcur
-        self.on_received = on_received
-
-    # noinspection PyPep8Naming
-    def OnReceived(self):
-        time = self.stockcur.GetHeaderValue(3)  # 시간
-        timess = self.stockcur.GetHeaderValue(18)  # 초
-        ex_flag = self.stockcur.GetHeaderValue(19)  # 예상체결 플래그
-        cprice = self.stockcur.GetHeaderValue(13)  # 현재가
-        diff = self.stockcur.GetHeaderValue(2)  # 대비
-        c_vol = self.stockcur.GetHeaderValue(17)  # 순간체결수량
-        vol = self.stockcur.GetHeaderValue(9)  # 거래량
-
-        if ex_flag == ord('1'):  # 동시호가 시간 (예상체결)
-            print("실시간(예상체결)", time, timess, "*", cprice, "대비", diff, "체결량", c_vol, "거래량", vol)
-        elif ex_flag == ord('2'):  # 장중(체결)
-            print("실시간(장중체결)", time, timess, cprice, "대비", diff, "체결량", c_vol, "거래량", vol)
-
-        self.on_received(time, timess, ex_flag, cprice, diff, c_vol, vol)
+    return codemgr().GetStockSupervisionKind(code)
 
 
-class StockSubscriber:
+def get_status(code: str):
     """
-    https://money2.creontrade.com/e5/mboard/ptype_basic/plusPDS/DW_Basic_Read.aspx?boardseq=299&seq=43&page=3&searchString=&prd=&lang=7&p=8833&v=8639&m=9505
+    0: 정상
+    1: 거래정지
+    2: 거래중단
     """
+    return codemgr().GetStockStatusKind(code)
 
-    def __init__(self, code):
-        self.code = code
-        # todo: StockCur 싱글톤인지 알아야함. 싱글톤일 경우 unsubscribe 시 모든 구독이 해제됨. 싱글톤 아닌것 같긴하다
-        self.stockcur = new_stockcur()
 
-    def subscribe(self, on_received):
-        handler = win32com.client.WithEvents(self.stockcur, CpEvent(self.stockcur, on_received))
-        self.stockcur.SetInputValue(0, self.code)
-        handler.set_params(self.stockcur)
-        self.stockcur.Subscribe()
-
-    def unsubscribe(self):
-        self.stockcur.Unsubscribe()
+def get_capital(code: str):
+    """
+    0: 제외
+    1: 대
+    2: 중
+    3: 소
+    """
+    return codemgr().GetStockCapital(code)

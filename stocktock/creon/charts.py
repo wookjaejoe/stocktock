@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime, date
-from enum import Enum
-from typing import *
 
 from .com import *
 
@@ -63,15 +61,15 @@ def date_to_int(d: date):
 
 def request(arguments: Dict[int, Any]) -> List[Dict[str, Any]]:
     for idx, value in arguments.items():
-        stockchart.SetInputValue(idx, value)
+        stockchart().SetInputValue(idx, value)
 
-    stockchart.BlockRequest()
+    stockchart().BlockRequest()
 
     result = []
-    output_names = stockchart.GetHeaderValue(2)  # 데이터 필드명
-    output_length = stockchart.GetHeaderValue(3)  # 수신 개수
+    output_names = stockchart().GetHeaderValue(2)  # 데이터 필드명
+    output_length = stockchart().GetHeaderValue(3)  # 수신 개수
     for i in range(output_length):
-        result.append({output_names[j]: stockchart.GetDataValue(j, i) for j in range(len(output_names))})
+        result.append({output_names[j]: stockchart().GetDataValue(j, i) for j in range(len(output_names))})
 
     return result
 

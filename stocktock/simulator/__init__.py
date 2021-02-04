@@ -37,7 +37,7 @@ class DataProvider(abc.ABC):
                 else:
                     time.sleep(0.1)
 
-        threading.Thread(target=start_watching).start()
+        threading.Thread(target=start_watching, daemon=True).start()
 
     def subscribe(self, func: Callable[[Any, ], Any]):
         self.subscriptions.append(func)

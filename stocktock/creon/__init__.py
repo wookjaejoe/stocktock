@@ -4,7 +4,7 @@ import time
 
 from pywinauto import application
 
-from . import com, stocks
+from . import traders, events, com, stocks
 
 # http://cybosplus.github.io/
 
@@ -13,6 +13,30 @@ CREON_PATH = 'C:\CREON\STARTER\coStarter.exe'
 CREON_ID = 'WJJO'
 PWD = 'dnrwo1!'
 PWD_CERT = 'Whdnrwo1!!'
+
+
+def connect():
+    if not com.cybos().IsConnect:
+        disconnect()
+        kill_client()
+        start_client()
+
+    for _ in range(300):
+        if com.cybos().IsConnect:
+            return
+        else:
+            time.sleep(1)
+
+    raise RuntimeError('Auto-startup failure')
+
+
+if not com.cybos().IsConnect:
+    connect()
+
+# todo: 실전투자에서 자동 로그인 활성화
+
+assert com.cybos().IsConnect, 'Disconnected'
+assert ctypes.windll.shell32.IsUserAnAdmin(), 'Not administrator'
 
 
 def start_client():
@@ -30,28 +54,5 @@ def kill_client():
 
 
 def disconnect():
-    if com.cybos.IsConnect:
-        com.cybos.PlusDisconnect()
-
-
-def connect():
-    if not com.cybos.IsConnect:
-        disconnect()
-        kill_client()
-        start_client()
-
-    for _ in range(300):
-        if com.cybos.IsConnect:
-            return
-        else:
-            time.sleep(1)
-
-    raise RuntimeError('Auto-startup failure')
-
-
-# todo: 실전 투자에서 활성화
-if not com.cybos.IsConnect:
-    connect()
-
-assert com.cybos.IsConnect, 'Disconnected'
-assert ctypes.windll.shell32.IsUserAnAdmin(), 'Not administrator'
+    if com.cybos().IsConnect:
+        com.cybos().PlusDisconnect()
