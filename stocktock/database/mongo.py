@@ -14,3 +14,7 @@ class DbManager:
     @classmethod
     def get_event_categories(cls):
         return cls.db.event_categories
+
+    @classmethod
+    def get_daily_charts(cls):
+        return cls.db.daily_charts
