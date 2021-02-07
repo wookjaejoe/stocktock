@@ -36,10 +36,3 @@ class Trader:
                                 price=0,
                                 hoga="03",
                                 order_no="")
-
-
-if __name__ == '__main__':
-    ret = Trader.buy(SAMSUNG_CODE, 1)
-    print(ret)
-    # todo: 리턴값 확인... 리턴값에 주문번호가 있을 수 있다. 오류 처리도 가능할 수 있다.
-    # Trader.sell(SAMSUNG_CODE, 1)

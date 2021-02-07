@@ -126,7 +126,7 @@ def is_kos(code):
 
 @limit_safe(ReqType.NON_TRADE)
 def get_detail(code: str) -> StockDetail:
-    _stockmst = stockcode()
+    _stockmst = stockmst()
 
     # 현재가 객체 구하기
     _stockmst.SetInputValue(0, code)
@@ -272,6 +272,7 @@ def get_details(stock_codes: List[str]):
 
         return result
 
+    stock_codes = stock_codes.copy()
     while stock_codes:
         req_limit = 110
         partial_codes = []

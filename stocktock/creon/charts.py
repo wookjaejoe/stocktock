@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, timezone, timedelta
 
 from .com import *
+
+KST = timezone(timedelta(hours=9))
 
 
 class ChartType(Enum):
@@ -12,20 +14,11 @@ class ChartType(Enum):
     TICK = ord('T')
 
 
-class ChartDataField(Enum):
-    date = 0
-    time = 1
-    open = 2
-    high = 3
-    low = 4
-    close = 5
-    vol = 8
-
-
 @dataclass
 class ChartData:
-    date: int
-    time: int
+    code: str
+    chart_type: ChartType
+    datetime: datetime
     open: int
     high: int
     low: int
@@ -33,70 +26,49 @@ class ChartData:
     vol: int
 
 
-@dataclass(init=False)
-class ChartDataEx(ChartData):
-    dt: datetime
+@limit_safe(req_type=ReqType.NON_TRADE)
+def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData]:
+    chart = stockchart()
 
-    def __init__(self):
-        pass
+    chart.SetInputValue(0, code)  # 종목코드
+    chart.SetInputValue(1, ord('2'))  # 개수로 받기
+    chart.SetInputValue(4, count)  # 조회 개수
+    # 요청항목 - 날짜,시간,시가,고가,저가,종가,거래량
+    chart.SetInputValue(5, [0, 1, 2, 3, 4, 5, 8])
+    chart.SetInputValue(6, chart_type.value)  # '차트 주기 - 분/틱
+    chart.SetInputValue(7, 1)  # 분틱차트 주기
+    chart.SetInputValue(9, ord('1'))  # 수정주가 사용
+    chart.BlockRequest()
 
-    @classmethod
-    def extend(cls, data: ChartData):
-        result = ChartDataEx()
-        result.__dict__ = data.__dict__.copy()
-        result.dt = datetime(
-            year=int(data.date / 10000),
-            month=int(data.date / 10000 / 100),
-            day=int(data.date / 10000) % 100,
-            hour=int(data.time / 100),
-            minute=data.time % 100
+    assert chart.GetDibStatus() == 0, chart.GetDibMsg1()
+    count = chart.GetHeaderValue(3)
+    items = []
+    for i in range(count):
+        _date = chart.GetDataValue(0, i)  # 날짜
+        _time = chart.GetDataValue(1, i)  # 시간
+        _open = chart.GetDataValue(2, i)  # 시가
+        high = chart.GetDataValue(3, i)  # 고가
+        low = chart.GetDataValue(4, i)  # 저가
+        close = chart.GetDataValue(5, i)  # 종가
+        vol = chart.GetDataValue(6, i)  # 거래량
+
+        try:
+            dt = datetime.strptime(str(_date), '%Y%m%d %H%M%S', ).astimezone(KST)
+        except:
+            dt = datetime.strptime(str(_date), '%Y%m%d').astimezone(KST)
+
+        data = ChartData(
+            code=code,
+            chart_type=chart_type,
+            datetime=dt,
+            open=_open,
+            high=high,
+            low=low,
+            close=close,
+            vol=vol
         )
 
-        return result
+        items.append(data)
 
-
-def date_to_int(d: date):
-    return int(d.strftime('%Y%m%d'))
-
-
-def request(arguments: Dict[int, Any]) -> List[Dict[str, Any]]:
-    for idx, value in arguments.items():
-        stockchart().SetInputValue(idx, value)
-
-    stockchart().BlockRequest()
-
-    result = []
-    output_names = stockchart().GetHeaderValue(2)  # 데이터 필드명
-    output_length = stockchart().GetHeaderValue(3)  # 수신 개수
-    for i in range(output_length):
-        result.append({output_names[j]: stockchart().GetDataValue(j, i) for j in range(len(output_names))})
-
-    return result
-
-
-def request_by_term(code,
-                    chart_type: ChartType,
-                    begin: datetime,
-                    end: datetime = datetime.now()):
-    return request({
-        0: code,  # 종목코드
-        1: ord('1'),  # 기간으로 지정
-        2: date_to_int(end),
-        3: date_to_int(begin),
-        5: [field.value for field in ChartDataField],  # 요청 필드
-        6: chart_type.value,  # 차트 주기
-        9: ord('1')  # 수정주가 사용
-    })
-
-
-def request_by_count(code,
-                     chart_type: ChartType,
-                     count=-1):
-    return request({
-        0: code,  # 종목코드
-        1: ord('2'),  # 개수로 지정
-        4: count,
-        5: [field.value for field in ChartDataField],  # 요청 필드
-        6: chart_type.value,  # 차트 주기
-        9: ord('1')  # 수정주가 사용
-    })
+    items.sort(key=lambda chart_data: chart_data.datetime)
+    return items

@@ -15,6 +15,7 @@ import argparse
 from dataclasses import dataclass
 from typing import *
 import schedule
+import traceback
 
 log.init()
 
@@ -207,6 +208,7 @@ def check_stop_line():
                     order_count=holding.count
                 ).summit()
         except:
+            logging.debug(traceback.format_exc())
             logging.warning(f'Failed to get expected price for {holding.code}')
 
 
@@ -228,7 +230,7 @@ def check_jumping():
     def run():
         details = stocks.get_details([stock.code for stock in stocks.ALL_STOCKS if stocks.get_status(stock.code) == 0])
         for detail in details:
-            if detail.yesterday_close * 1.02 <= detail.open:
+            if detail.yesterday_close * 1.05 <= detail.open:
                 Record(
                     what=f'갭상승 2%',
                     order_type=traders.OrderType.BUY,
@@ -237,11 +239,12 @@ def check_jumping():
                     order_count=int(100_0000 / detail.price)
                 ).summit()
 
-    threading.Thread(target=run).start()
+    # threading.Thread(target=run, daemon=True).start()
+    run()
 
 
 def main():
-    check_jumping()
+    # check_jumping()
     start_scheduling()
     events.subscribe(callback)
     events.start()

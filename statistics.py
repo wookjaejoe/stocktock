@@ -19,17 +19,16 @@ class HoldingStockEvaluation:
     earnings: int
     earnings_rate: float
 
-    def __init__(self, holding: Holding):
-        cprice = stocks.get_detail(holding.code).cprice
+    def __init__(self, holding: Holding, detail: stocks.StockDetail2):
         self.code = holding.code  # 종목코드
-        self.name = stocks.get_name(holding.code)  # 종목명
+        self.name = detail.name  # 종목명
         self.buy_price = holding.price  # 매수가
-        self.cur_price = cprice  # 현재가(종가)
+        self.cur_price = detail.price  # 현재가(종가)
         self.count = holding.count
         self.buy_total = holding.price * holding.count  # 매수가 * 개수
-        self.cur_total = cprice * holding.count  # 현재가 * 개수
-        self.earnings = cprice * holding.count - holding.price * holding.count  # 수익금
-        self.earnings_rate = calc.earnings_ratio(holding.price, cprice)  # 수익률
+        self.cur_total = detail.price * holding.count  # 현재가 * 개수
+        self.earnings = detail.price * holding.count - holding.price * holding.count  # 수익금
+        self.earnings_rate = calc.earnings_ratio(holding.price, detail.price)  # 수익률
 
 
 @dataclass(init=False)
@@ -38,8 +37,9 @@ class Statistics:
 
     def __init__(self):
         self.evaluations = []
+        details = {detail.code: detail for detail in stocks.get_details([holding.code for holding in wallet.holdings])}
         for holding in wallet.holdings:
-            ev = HoldingStockEvaluation(holding)
+            ev = HoldingStockEvaluation(holding, details.get(holding.code))
             self.evaluations.append(ev)
             time.sleep(0.1)
 
