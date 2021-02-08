@@ -1,11 +1,15 @@
+import logging
+import pickle
+import threading
+import time
 from typing import *
 
 import jsons
 from bson import json_util
 
+from creon import stocks, charts
 from creon.charts import ChartData
 from database import mongo
-from concurrent.futures import ThreadPoolExecutor
 
 db = mongo.DbManager.get_daily_charts()
 
@@ -14,7 +18,7 @@ def find(**query):
     def load(item: dict) -> ChartData:
         return jsons.load(item, ChartData, object_hook=json_util.object_hook)
 
-    for found in  db.find(query):
+    for found in db.find(query):
         yield load(found)
 
 
@@ -22,48 +26,71 @@ def find_by_code(code: str):
     return find(code=code)
 
 
-def insert(code: str, data: List[ChartData]):
-    obj = jsons.dump(data, default=json_util.default)
-    obj.code = code
-    db.insert_one(obj)
+def insert_many(data: List[ChartData]):
+    target = jsons.dump(data, default=json_util.default)
+    db.insert_many(target)
 
 
-def update(chart_data: ChartData):
-    query = {
-        'code': chart_data.code,
-        'datetime': chart_data.datetime,
-        'chart_type': chart_data.chart_type.name
-    }
+class AutoUpdater:
 
-    if find(code=chart_data.code,
-            datatime=chart_data.datetime,
-            chart_type=chart_data.chart_type.name):
-        return db.update(query, jsons.dump(chart_data, default=json_util.default))
-    else:
-        return db.insert_one(jsons.dump(chart_data, default=json_util.default))
+    def __init__(self):
+        self.finished = False
+        self.queue = []
+        self.cache = []
 
+    def start(self):
+        db.drop()
+        threading.Thread(target=self.start_gathering).start()
+        threading.Thread(target=self.start_inserting).start()
 
-def auto_update():
-    from creon import stocks, charts
+        while not self.finished:
+            time.sleep(5)
 
-    # 각 종목에 대해
-    for stock in stocks.ALL_STOCKS:
-        # 새 차트 조회
-        new_chart = charts.request(code=stock.code,
+    def start_gathering(self):
+        num = 0
+        for stock in stocks.ALL_STOCKS:
+            num += 1
+            logging.debug(f'[{num}/{len(stocks.ALL_STOCKS)}] Gathering and inserting charts for {stock.code}...')
+            # 새 차트 조회
+            chart = charts.request(code=stock.code,
                                    chart_type=charts.ChartType.DAY,
-                                   count=100)
+                                   count=150)
 
-        # DB 에서 해당 종목 차트 조회
-        old_chart = find(
-            code=stock.code
-        )
+            self.cache.extend(chart)
+            self.queue.extend(chart)
 
-        for chart_data in new_chart:
-            if chart_data.datetime in [x.datetime for x in old_chart]:
-                # 해당 일시 데이터 있으면, PASS
-                pass
-            else:
-                # 해당 일시 데이터 없으면, 추가
-                insert(chart_data)
+        self.finished = True
+        logging.info('FINISHED: Gathering all charts.')
 
-# fixme: 성능 튜닝
+    def start_inserting(self):
+        def do_insert():
+            data, self.queue = self.queue, []
+            if data:
+                logging.debug(f'Inserting {len(data)} data...')
+                insert_many(data)
+
+        while not self.finished:
+            do_insert()
+            time.sleep(5)
+
+        do_insert()
+        logging.info('FINISHED: Inserting all charts into the database.')
+
+
+def get_cahce_path():
+    return f'.dailycharts.pickle'
+
+
+def save_cache(data: List[ChartData]):
+    with open(get_cahce_path(), 'wb') as f:
+        pickle.dump(data, f)
+
+
+def load_cache() -> List[ChartData]:
+    with open(get_cahce_path(), 'rb') as f:
+        return pickle.load(f)
+
+
+def update():
+    updater = AutoUpdater()
+    updater.start()

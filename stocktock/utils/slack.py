@@ -86,4 +86,5 @@ class WarrenSession(Warren):
         self.ts = super(WarrenSession, self).send(Message(initial_msg))
 
     def send(self, sendable: Sendable, ts=None):
+        # todo: 메세지 큐잉
         super(WarrenSession, self).send(sendable, self.ts)

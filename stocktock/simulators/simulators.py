@@ -1,5 +1,6 @@
 import csv
 import logging
+import os
 import threading
 import time
 import traceback
@@ -21,7 +22,9 @@ class Holding:
 class Wallet:
 
     def __init__(self, name):
-        self.path = f'{name}.csv'
+        folder = 'wallets'
+        os.makedirs(folder, exist_ok=True)
+        self.path = os.path.join(folder, f'{name}.csv')
         self.holdings: List[Holding] = []
 
         try:

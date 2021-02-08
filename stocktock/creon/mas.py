@@ -32,7 +32,7 @@ class MaCalculator:
             self.chart = charts.request(
                 code=code,
                 chart_type=charts.ChartType.DAY,
-                count=120
+                count=150
             )
 
     def get(self, ma_type: MA, cur_price=0, pos=0):
@@ -60,8 +60,7 @@ _calc_pool: Dict[str, MaCalculator] = {}
 
 def init_pool():
     logging.debug('Loading chart data from dataabase...')
-
-    for chart_data in dailycharts.find():
+    for chart_data in dailycharts.load_cache():
         if chart_data.code not in _calc_pool:
             _calc_pool.update({chart_data.code: MaCalculator(chart_data.code, [])})
 
