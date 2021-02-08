@@ -200,6 +200,10 @@ class Simulator_1(Simulator):
         super().__init__('[3]골든_데드_크로스')
 
     def on_event(self, event: events.Event):
+        # 골든/데드 크로스 아닌 이벤트는 무시
+        if event.category in [44, 45]:
+            return
+
         if event.code not in available_codes:
             return
 
@@ -208,14 +212,11 @@ class Simulator_1(Simulator):
         ma_20_cur = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
         ma_20_prv = ma_calc.get(mas.MA.MA_20, pos=-1)
 
-        xx = [ma_20_prv, ma_20_cur, detail.price]
-        self.logger.debug(', '.join([str(x) for x in xx]))
-        if ma_20_prv < ma_20_cur < detail.price:
-            # 20MA 기울기 > 0일때만 동작
-            if event.category == 45:
-                self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.ask)
-            elif event.category == 44:
-                self.try_sell(code=event.code, what='[3-46]데드크로스', order_price=detail.bid)
+        if event.category == 45 and ma_20_prv < ma_20_cur:
+            # 골든크로스 & 어제_20MA < 현재_20MA < 현재가
+            self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.ask)
+        elif event.category == 44:
+            self.try_sell(code=event.code, what='[3-46]데드크로스', order_price=detail.bid)
 
     def run(self):
         events.subscribe(self.on_event)
@@ -238,14 +239,15 @@ class Simulator_2(Simulator):
         while True:
             self.logger.debug('# HEALTH CHECK #')
             details = stocks.get_details(available_codes)
+            # 모든 취급 종목에 대해...
             for detail in details:
+                # 5MA, 20MA 구한다
                 ma_calc = mas.get_calculator(detail.code)
                 ma_5 = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
                 ma_20 = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
 
-                xx = [detail.open, ma_5, ma_20, detail.price]
-                self.logger.debug(', '.join([str(x) for x in xx]))
-                if detail.open < ma_5 and ma_20 < ma_5 <= detail.price:
+                if ma_20 < detail.open < ma_5 <= detail.price:
+                    # 시가 < 5MA & 20MA < 5MA <= 현재가
                     self.try_buy(
                         code=detail.code,
                         what='[2]5일선_상향돌파',
@@ -266,21 +268,22 @@ class Simulator_3(Simulator):
     def run(self):
         while True:
             self.logger.debug('# HEALTH CHECK #')
+
+            # 취급 종목의 상세정보 구한다
             details = stocks.get_details(available_codes)
             for detail in details:
+                # 본 종목의 60/120MA를 구한다
                 ma_calc = mas.get_calculator(detail.code)
                 ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=detail.price)
                 ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=detail.price)
 
-                xx = [detail.price, ma_60 * 1.02, ma_120 * 1.02, detail.open]
-                self.logger.debug(', '.join([str(x) for x in xx]))
-                if detail.price < ma_60 * 1.02 < detail.open:
+                if ma_60 <= detail.price <= ma_60 * 1.02:
                     self.try_buy(
                         code=detail.code,
                         what='[1]60MA_하방터치',
                         order_price=detail.ask
                     )
-                elif detail.price < ma_120 * 1.02 < detail.open:
+                elif ma_120 <= detail.price <= ma_120 * 1.02:
                     self.try_buy(
                         code=detail.code,
                         what='[1]120MA_하방터치',
