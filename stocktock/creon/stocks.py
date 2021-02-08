@@ -103,6 +103,14 @@ def get_all(market_type: MarketType) -> List[Stock]:
 ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 
 
+def get_available() -> List[str]:
+    """
+    임시 코드 - 시가 총액 2000억 ~ 10000억
+    """
+    all_codes = [stock.code for stock in ALL_STOCKS if get_status(stock.code) == 0 and get_supervision(stock.code) == 0]
+    return [detail.code for detail in get_details(all_codes)]
+
+
 def get_name(code: str):
     _stockcode = stockcode()
 
@@ -135,6 +143,11 @@ def get_detail(code: str) -> StockDetail:
     req_msg = _stockmst.GetDibMsg1()
     assert req_status == 0, f'Request Failure: ({req_status}) {req_msg}'
 
+    try:
+        exFlag=ExpectedFlag(_stockmst.GetHeaderValue(58))
+    except:
+        exFlag=None
+
     # todo: 헤더 훨씬 많음
     # http://cybosplus.github.io/cpdib_rtf_1_/stockmst.htm
     return StockDetail(
@@ -153,7 +166,7 @@ def get_detail(code: str) -> StockDetail:
         vol_value=_stockmst.GetHeaderValue(19),  # 거래대금
 
         # 예상 체결관련 정보
-        exFlag=ExpectedFlag(_stockmst.GetHeaderValue(58)),  # 예상체결가 구분 플래그
+        exFlag=exFlag,  # 예상체결가 구분 플래그
         exPrice=_stockmst.GetHeaderValue(55),  # 예상체결가
         exDiff=_stockmst.GetHeaderValue(56),  # 예상체결가 전일대비
         exVol=_stockmst.GetHeaderValue(57),  # 예상체결수량
@@ -194,7 +207,7 @@ class StockDetail2:
     total_buying_balance: int  # 총매수잔량
     selling_balance: int  # 매도잔량
     buying_balance: int  # 매수잔량
-    shared_number: int  # 상장주식수
+    listed_stock_count: int  # 상장주식수
     foreign_ownership_ratio: int  # 외국인보유비율(%)
     yesterday_close: int  # 전일종가
     yesterday_volumn: int  # 전일거래량
@@ -227,6 +240,9 @@ class StockDetail2:
 
     field_29: int  # 예상체결가 거래량
 
+    def capitalization(self):
+        return self.listed_stock_count * self.price
+
 
 @limit_safe(req_type=ReqType.NON_TRADE)
 def get_details(stock_codes: List[str]):
@@ -255,7 +271,7 @@ def get_details(stock_codes: List[str]):
                 total_buying_balance=_stockmst2.GetDataValue(14, i),
                 selling_balance=_stockmst2.GetDataValue(15, i),
                 buying_balance=_stockmst2.GetDataValue(16, i),
-                shared_number=_stockmst2.GetDataValue(17, i),
+                listed_stock_count=_stockmst2.GetDataValue(17, i),
                 foreign_ownership_ratio=_stockmst2.GetDataValue(18, i),
                 yesterday_close=_stockmst2.GetDataValue(19, i),
                 yesterday_volumn=_stockmst2.GetDataValue(20, i),
@@ -331,7 +347,7 @@ def get_status(code: str):
     return codemgr().GetStockStatusKind(code)
 
 
-def get_capital(code: str):
+def get_capital_type(code: str):
     """
     0: 제외
     1: 대

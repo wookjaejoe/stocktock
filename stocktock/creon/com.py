@@ -9,21 +9,16 @@ def client(dispatch: str):
     return win32com.client.Dispatch(dispatch)
 
 
-_cybos = client("CpUtil.CpCybos")
-_stockcode = client("CpUtil.CpStockCode")
-_codemgr = client("CpUtil.CpCodeMgr")
-
-
 def cybos():
-    return _cybos
+    return client("CpUtil.CpCybos")
 
 
 def stockcode():
-    return _stockcode
+    return client("CpUtil.CpStockCode")
 
 
 def codemgr():
-    return _codemgr
+    return client("CpUtil.CpCodeMgr")
 
 
 def stockmst():

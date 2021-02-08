@@ -101,7 +101,7 @@ class CpRpMarketWatch:
 
         self.objStockMst.SetInputValue(0, code)
         # 1: 종목 뉴스 2: 공시정보 10: 외국계 창구첫매수, 11:첫매도 12 외국인 순매수 13 순매도
-        categories = [44, 45, 46, 47, 58, 59]  # todo: externalize
+        categories = [44, 45]  # todo: externalize
         self.objStockMst.SetInputValue(1, ','.join([str(c) for c in categories]))
         self.objStockMst.SetInputValue(2, 0)  # 시작 시간: 0 처음부터
         self.objStockMst.BlockRequest()
