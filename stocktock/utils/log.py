@@ -13,7 +13,7 @@ DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 LOG_FOLDER = os.path.abspath('logs')
 os.makedirs(LOG_FOLDER, exist_ok=True)
 
-LOG_FORMAT_DETAILS = '%(asctime)s, %(levelname)-8s, %(message)s'
+LOG_FORMAT_DETAILS = '%(name)s, %(asctime)s, %(levelname)-8s, %(message)s'
 
 
 class ConsoleLogFormatter(logging.Formatter):

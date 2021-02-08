@@ -5,23 +5,27 @@ from bson import json_util
 
 from creon.charts import ChartData
 from database import mongo
+from concurrent.futures import ThreadPoolExecutor
 
 db = mongo.DbManager.get_daily_charts()
 
 
-def find(**query) -> List[ChartData]:
+def find(**query):
     def load(item: dict) -> ChartData:
         return jsons.load(item, ChartData, object_hook=json_util.object_hook)
 
-    return [load(found) for found in db.find(query)]
+    for found in  db.find(query):
+        yield load(found)
 
 
-def insert_many(data: List[ChartData]):
-    db.insert_many(jsons.dump(data, default=json_util.default))
+def find_by_code(code: str):
+    return find(code=code)
 
 
-def insert(data: ChartData):
-    db.insert_one(jsons.dump(data, default=json_util.default))
+def insert(code: str, data: List[ChartData]):
+    obj = jsons.dump(data, default=json_util.default)
+    obj.code = code
+    db.insert_one(obj)
 
 
 def update(chart_data: ChartData):
@@ -61,3 +65,5 @@ def auto_update():
             else:
                 # 해당 일시 데이터 없으면, 추가
                 insert(chart_data)
+
+# fixme: 성능 튜닝

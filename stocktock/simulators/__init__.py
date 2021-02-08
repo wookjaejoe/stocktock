@@ -4,8 +4,6 @@ import time
 from datetime import datetime, timedelta
 from typing import *
 
-from creon import charts
-
 
 class Simulator:
 
@@ -54,7 +52,6 @@ class CandleProvider:
 
     def get(self, when: datetime):
         pass
-
 
 
 class EventProvider(DataProvider):

@@ -73,11 +73,17 @@ class Warren(SlackApp):
 
 class WarrenSession(Warren):
 
-    def __init__(self):
+    def __init__(self, title):
         super().__init__()
         hostname = socket.gethostname()
         host = socket.gethostbyname(hostname)
-        self.ts = super(WarrenSession, self).send(Message(f'SESSION CONNECTED - {hostname}({host})'))
+
+        initial_msg = '\n'.join([
+            f'SESSION CONNECTED - {hostname}({host})',
+            title
+        ])
+
+        self.ts = super(WarrenSession, self).send(Message(initial_msg))
 
     def send(self, sendable: Sendable, ts=None):
-        threading.Thread(target=lambda: super(WarrenSession, self).send(sendable, self.ts), daemon=True).start()
+        super(WarrenSession, self).send(sendable, self.ts)

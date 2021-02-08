@@ -29,7 +29,6 @@ class ChartData:
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData]:
     chart = stockchart()
-
     chart.SetInputValue(0, code)  # 종목코드
     chart.SetInputValue(1, ord('2'))  # 개수로 받기
     chart.SetInputValue(4, count)  # 조회 개수
