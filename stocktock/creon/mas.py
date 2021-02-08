@@ -4,6 +4,7 @@ from typing import *
 
 from creon import charts
 from database import dailycharts
+from datetime import date, timedelta
 
 
 class MA(Enum):
@@ -59,14 +60,18 @@ _calc_pool: Dict[str, MaCalculator] = {}
 
 
 def init_pool():
-    logging.debug('Loading chart data from dataabase...')
+    logging.info('Loading chart data from dataabase...')
     for chart_data in dailycharts.load_cache():
         if chart_data.code not in _calc_pool:
             _calc_pool.update({chart_data.code: MaCalculator(chart_data.code, [])})
 
         _calc_pool.get(chart_data.code).chart.append(chart_data)
 
-    logging.debug('FINISHED - The initialzation for MA calculator pool')
+    yesterday = date.today() - timedelta(days=1)
+    if max([cd.datetime for cd in list(_calc_pool.values())[0].chart]).date() != yesterday:
+        logging.warning('Chart may be not upated !!!')
+
+    logging.info('FINISHED - The initialzation for MA calculator pool')
 
 
 init_pool()

@@ -187,8 +187,8 @@ def init_available_codes():
             straights.append(code)
 
     available_codes = straights
-    for av_code in available_codes:
-        print(av_code, details.get(av_code).name)
+    logging.debug(f'Available codes: {len(available_codes)}')
+
 
 
 init_available_codes()
@@ -244,18 +244,21 @@ class Simulator_2(Simulator):
             details = stocks.get_details(available_codes)
             # 모든 취급 종목에 대해...
             for detail in details:
-                # 5MA, 20MA 구한다
-                ma_calc = mas.get_calculator(detail.code)
-                ma_5 = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
-                ma_20 = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
+                try:
+                    # 5MA, 20MA 구한다
+                    ma_calc = mas.get_calculator(detail.code)
+                    ma_5 = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
+                    ma_20 = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
 
-                if ma_20 < detail.open < ma_5 <= detail.price:
-                    # 시가 < 5MA & 20MA < 5MA <= 현재가
-                    self.try_buy(
-                        code=detail.code,
-                        what='[2]5일선_상향돌파',
-                        order_price=detail.ask
-                    )
+                    if ma_20 < detail.open < ma_5 <= detail.price:
+                        # 시가 < 5MA & 20MA < 5MA <= 현재가
+                        self.try_buy(
+                            code=detail.code,
+                            what='[2]5일선_상향돌파',
+                            order_price=detail.ask
+                        )
+                except:
+                    logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
             time.sleep(30)
 
@@ -275,22 +278,25 @@ class Simulator_3(Simulator):
             # 취급 종목의 상세정보 구한다
             details = stocks.get_details(available_codes)
             for detail in details:
-                # 본 종목의 60/120MA를 구한다
-                ma_calc = mas.get_calculator(detail.code)
-                ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=detail.price)
-                ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=detail.price)
+                try:
+                    # 본 종목의 60/120MA를 구한다
+                    ma_calc = mas.get_calculator(detail.code)
+                    ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=detail.price)
+                    ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=detail.price)
 
-                if ma_60 <= detail.price <= ma_60 * 1.02:
-                    self.try_buy(
-                        code=detail.code,
-                        what='[1]60MA_하방터치',
-                        order_price=detail.ask
-                    )
-                elif ma_120 <= detail.price <= ma_120 * 1.02:
-                    self.try_buy(
-                        code=detail.code,
-                        what='[1]120MA_하방터치',
-                        order_price=detail.ask
-                    )
+                    if ma_60 <= detail.price <= ma_60 * 1.02:
+                        self.try_buy(
+                            code=detail.code,
+                            what='[1]60MA_하방터치',
+                            order_price=detail.ask
+                        )
+                    elif ma_120 <= detail.price <= ma_120 * 1.02:
+                        self.try_buy(
+                            code=detail.code,
+                            what='[1]120MA_하방터치',
+                            order_price=detail.ask
+                        )
+                except:
+                    logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
             time.sleep(30)
