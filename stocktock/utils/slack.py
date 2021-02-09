@@ -81,8 +81,8 @@ class WarrenSession(Warren):
         host = socket.gethostbyname(hostname)
 
         initial_msg = '\n'.join([
-            f'SESSION CONNECTED - {hostname}({host})',
-            title
+            f'`SESSION CONNECTED - {hostname}({host})`',
+            f':brain: *{title}*'
         ])
 
         self.ts = super(WarrenSession, self).send(Message(initial_msg))

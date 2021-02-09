@@ -16,18 +16,20 @@ from simulators import simulators
 
 def main():
     market_open_time = datetime.time(hour=9, minute=0, second=0)
+    logging.info('APP STARTED')
+    logging.info(f'장시작 확인 및 대기 - 장시작: {market_open_time}')
     while True:
         now = datetime.datetime.now()
 
         if now.time() > market_open_time:
             break
 
-        print('장시작 대기...', end='\r')
         time.sleep(1)
 
+    logging.info('LET START SIMULATIONS')
     simulators.Simulator_2().start()
-    simulators.Simulator_3().start()
-    simulators.Simulator_1().start()
+    # simulators.Simulator_3().start()
+    # simulators.Simulator_1().start()
 
     while True:
         time.sleep(1)
