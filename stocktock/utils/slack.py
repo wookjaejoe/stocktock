@@ -5,7 +5,6 @@ __author__ = 'wookjae.jo'
 
 import logging
 import socket
-import threading
 from dataclasses import dataclass
 
 from slack_sdk import WebClient
@@ -15,6 +14,9 @@ logger.setLevel(logging.INFO)
 
 STR_TS = 'ts'
 enable = True
+
+logging.getLogger('slack_sdk.web.base_client').setLevel(logging.ERROR)
+logging.getLogger('slack_sdk.web.slack_response').setLevel(logging.ERROR)
 
 
 class Sendable:
