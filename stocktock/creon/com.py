@@ -55,7 +55,9 @@ def limit_safe(req_type: ReqType):
         assert isinstance(func, Callable), 'Something wrong...'
 
         def run(*arg, **kwargs):
-            while not cybos().GetLimitRemainCount(req_type.value):
+            # !!! LimitRemainCount가 1 남았을때 멈추는 것이 경험상 최선 !!!
+            # 이러면 경고 팝업은 안뜨는 듯(경고 팝업 뜨면 프로그램 멈춤)
+            while cybos().GetLimitRemainCount(req_type.value) < 2:
                 # limit-remain-count 0이면, 1초 대기
                 time.sleep(1)
 
