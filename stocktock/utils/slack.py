@@ -5,7 +5,10 @@ __author__ = 'wookjae.jo'
 
 import logging
 import socket
+import threading
+import time
 from dataclasses import dataclass
+from typing import *
 
 from slack_sdk import WebClient
 
@@ -41,11 +44,6 @@ class SlackApp:
         self.channel = channel
         self.queue = []
 
-    def consume_message(self):
-        while True:
-            if self.queue:
-                sendable = self.queue.pop()
-
     def send(self, sendable: Sendable, ts=None):
         if isinstance(sendable, Message):
             response = self.client.chat_postMessage(
@@ -77,6 +75,7 @@ class WarrenSession(Warren):
 
     def __init__(self, title):
         super().__init__()
+        self.queue: List[Sendable] = []
         hostname = socket.gethostname()
         host = socket.gethostbyname(hostname)
 
@@ -86,7 +85,15 @@ class WarrenSession(Warren):
         ])
 
         self.ts = super(WarrenSession, self).send(Message(initial_msg))
+        threading.Thread(target=self.start_consuming).start()
+
+    def start_consuming(self):
+        sup = super(WarrenSession, self)
+        while True:
+            while self.queue:
+                sup.send(self.queue.pop(), self.ts)
+
+            time.sleep(1)
 
     def send(self, sendable: Sendable, ts=None):
-        # todo: 메세지 큐잉
-        super(WarrenSession, self).send(sendable, self.ts)
+        self.queue.append(sendable)
