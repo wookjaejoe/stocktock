@@ -40,7 +40,6 @@ class MaCalculator:
         """
         Ex) 오늘 ma 조회 get(ma, cur_price)
         Ex) 어제 ma 조회 get(ma, pos=-1)
-
         """
         if pos:
             return avg([cd.close for cd in self.chart[-ma_type.value + pos: pos]])
@@ -49,10 +48,10 @@ class MaCalculator:
             # 최근 n-1개 데이터 및 현재가의 평균
             return avg([cd.close for cd in self.chart[-ma_type.value:]] + [cur_price])
 
-    def is_straight(self, cur_price):
-        ma_20 = self.get(ma_type=MA.MA_20, cur_price=cur_price)
-        ma_60 = self.get(ma_type=MA.MA_60, cur_price=cur_price)
-        ma_120 = self.get(ma_type=MA.MA_120, cur_price=cur_price)
+    def is_straight(self):
+        ma_20 = self.get(ma_type=MA.MA_20, pos=-1)
+        ma_60 = self.get(ma_type=MA.MA_60, pos=-1)
+        ma_120 = self.get(ma_type=MA.MA_120, pos=-1)
         return ma_20 > ma_60 > ma_120
 
 
@@ -69,7 +68,7 @@ def init_pool():
 
     yesterday = date.today() - timedelta(days=1)
     if max([cd.datetime for cd in list(_calc_pool.values())[0].chart]).date() != yesterday:
-        logging.warning('Chart may be not upated !!!')
+        logging.warning('!!! CHART MAY BE NOT UPDATED !!!')
 
     logging.info('FINISHED - The initialzation for MA calculator pool')
 
