@@ -2,10 +2,12 @@ import time
 from dataclasses import dataclass
 from typing import *
 
-from app import wallet, Holding
+from simulators import simulators
 from creon import stocks
 from utils import calc
 
+
+wallet = simulators.Simulator_2().wallet
 
 @dataclass(init=False)
 class HoldingStockEvaluation:
@@ -19,7 +21,7 @@ class HoldingStockEvaluation:
     earnings: int
     earnings_rate: float
 
-    def __init__(self, holding: Holding, detail: stocks.StockDetail2):
+    def __init__(self, holding: simulators.Holding, detail: stocks.StockDetail2):
         self.code = holding.code  # 종목코드
         self.name = detail.name  # 종목명
         self.buy_price = holding.price  # 매수가
