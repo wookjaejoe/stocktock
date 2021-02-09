@@ -101,6 +101,7 @@ class Simulator:
 
     def start_checking_stop_line(self):
         while True:
+            self.logger.debug('# HEALTH CHECK #')
             details: Dict[str, stocks.StockDetail2] = {
                 detail.code: detail for detail in
                 stocks.get_details([holding.code for holding in self.wallet.holdings])
@@ -109,6 +110,11 @@ class Simulator:
             for holding in self.wallet.holdings:
                 try:
                     detail = details.get(holding.code)
+
+                    if not detail:
+                        logging.warning('The detail is null: ' + holding.code)
+                        continue
+
                     cur_price = detail.price
                     earnings_rate = calc.earnings_ratio(holding.price, cur_price)
                     if earnings_rate < -self.stop_line_abs or earnings_rate > self.stop_line_abs:
@@ -119,7 +125,7 @@ class Simulator:
                     self.logger.debug(traceback.format_exc())
                     self.logger.warning(f'Failed to get expected price for {holding.code}')
 
-            time.sleep(60)
+            time.sleep(10)
 
     def try_buy(self, code: str, what: str, order_price: int = None):
         if self.wallet.has(code):
@@ -127,7 +133,7 @@ class Simulator:
 
         if not order_price:
             detail = list(stocks.get_details([code]))[0]
-            order_price = detail.ask
+            order_price = detail.price
 
         order_count = int(100_0000 / order_price)
         order_total = order_price * order_count
@@ -150,7 +156,7 @@ class Simulator:
 
         if not order_price:
             detail = list(stocks.get_details([code]))[0]
-            order_price = detail.bid
+            order_price = detail.price
 
         order_total = order_price * holding.count
         holding_total = holding.price * holding.count
@@ -180,6 +186,7 @@ def init_available_codes():
     }
 
     # 정배열만 필터링
+    logging.debug(f'Filtering for straighhts...')
     straights = []
     for code, detail in details.items():
         calculator = mas.get_calculator(detail.code)
@@ -187,8 +194,7 @@ def init_available_codes():
             straights.append(code)
 
     available_codes = straights
-    logging.debug(f'Available codes: {len(available_codes)}')
-
+    logging.info(f'Available codes: {len(available_codes)}')
 
 
 init_available_codes()
@@ -260,7 +266,7 @@ class Simulator_2(Simulator):
                 except:
                     logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
-            time.sleep(30)
+            time.sleep(10)
 
 
 class Simulator_3(Simulator):
@@ -299,4 +305,4 @@ class Simulator_3(Simulator):
                 except:
                     logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
-            time.sleep(30)
+            time.sleep(10)
