@@ -46,13 +46,17 @@ class AutoUpdater:
         while not self.finished:
             time.sleep(5)
 
+        logging.debug(f'Saving caches: {len(self.cache)}')
+        save_cache(self.cache)
+
     def start_gathering(self):
         num = 0
-        for stock in stocks.ALL_STOCKS:
+        availables = stocks.get_availables()
+        for code in availables:
             num += 1
-            logging.debug(f'[{num}/{len(stocks.ALL_STOCKS)}] Gathering and inserting charts for {stock.code}...')
+            logging.debug(f'[{num}/{len(availables)}] Gathering and inserting charts for {code}...')
             # 새 차트 조회
-            chart = charts.request(code=stock.code,
+            chart = charts.request(code=code,
                                    chart_type=charts.ChartType.DAY,
                                    count=150)
 

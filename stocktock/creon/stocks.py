@@ -1,5 +1,9 @@
+from __future__ import annotations
+
+import logging
 from dataclasses import dataclass
 
+from creon import mas
 from .com import *
 
 
@@ -102,13 +106,48 @@ def get_all(market_type: MarketType) -> List[Stock]:
 
 ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 
+_availables = None
 
-def get_available() -> List[str]:
+
+def get_availables() -> List[str]:
     """
     임시 코드 - 시가 총액 2000억 ~ 10000억
     """
-    all_codes = [stock.code for stock in ALL_STOCKS if get_status(stock.code) == 0 and get_supervision(stock.code) == 0]
-    return [detail.code for detail in get_details(all_codes)]
+    global _availables
+    if _availables:
+        return _availables
+
+    # 찌꺼기 필터링
+    logging.info('Filtering trashes...')
+    available_codes = [stock.code for stock in ALL_STOCKS if
+                       get_status(stock.code) == 0 and
+                       get_supervision(stock.code) == 0 and
+                       get_control_kind(stock.code) == 0 and
+                       get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST]
+
+    # 시가 총액 기반 필터링
+    logging.info('Filtering with capitalizations...')
+    available_codes = [detail.code for detail in get_details(available_codes) if
+                       2000_0000_0000 < detail.capitalization() < 2_0000_0000_0000]
+
+    # 디테일 생성
+    logging.info(f'Make details for {len(available_codes)} stocks...')
+    details: Dict[str, StockDetail2] = {
+        detail.code: detail
+        for detail in get_details(available_codes)
+    }
+
+    # 정배열 필터링
+    logging.info(f'Filtering with straighhts...')
+    straights = []
+    for code, detail in details.items():
+        calculator = mas.get_calculator(detail.code)
+        if calculator.is_straight():
+            straights.append(code)
+
+    _availables = straights
+    logging.info(f'Finished filtering - final availables: {len(_availables)}')
+    return _availables
 
 
 def get_name(code: str):
@@ -144,9 +183,9 @@ def get_detail(code: str) -> StockDetail:
     assert req_status == 0, f'Request Failure: ({req_status}) {req_msg}'
 
     try:
-        exFlag=ExpectedFlag(_stockmst.GetHeaderValue(58))
+        exFlag = ExpectedFlag(_stockmst.GetHeaderValue(58))
     except:
-        exFlag=None
+        exFlag = None
 
     # todo: 헤더 훨씬 많음
     # http://cybosplus.github.io/cpdib_rtf_1_/stockmst.htm
@@ -355,3 +394,40 @@ def get_capital_type(code: str):
     3: 소
     """
     return codemgr().GetStockCapital(code)
+
+
+class SectionKind(Enum):
+    CPC_KSE_SECTION_KIND_NULL = 0  # 구분없음
+    CPC_KSE_SECTION_KIND_ST = 1  # 주권
+    CPC_KSE_SECTION_KIND_MF = 2  # 투자회사
+    CPC_KSE_SECTION_KIND_RT = 3  # 부동산투자회사
+    CPC_KSE_SECTION_KIND_SC = 4  # 선박투자회사
+    CPC_KSE_SECTION_KIND_IF = 5  # 사회간접자본투융자회사
+    CPC_KSE_SECTION_KIND_DR = 6  # 주식예탁증서
+    CPC_KSE_SECTION_KIND_SW = 7  # 신수인수권증권
+    CPC_KSE_SECTION_KIND_SR = 8  # 신주인수권증서
+    CPC_KSE_SECTION_KIND_ELW = 9  # 주식워런트증권
+    CPC_KSE_SECTION_KIND_ETF = 10  # 상장지수펀드(ETF)
+    CPC_KSE_SECTION_KIND_BC = 11  # 수익증권
+    CPC_KSE_SECTION_KIND_FETF = 12  # 해외ETF
+    CPC_KSE_SECTION_KIND_FOREIGN = 13  # 외국주권
+    CPC_KSE_SECTION_KIND_FU = 14  # 선물
+    CPC_KSE_SECTION_KIND_OP = 15  # 옵션
+
+
+def get_stock_section_kind(code: str) -> Optional[SectionKind]:
+    try:
+        return SectionKind(codemgr().GetStockSectionKind(code))
+    except:
+        pass
+
+
+def get_control_kind(code: str):
+    """
+    [helpstring("정상")]    CPC_CONTROL_NONE           = 0,
+    [helpstring("주의")]    CPC_CONTROL_ATTENTION      = 1,
+    [helpstring("경고")]    CPC_CONTROL_WARNING        = 2,
+    [helpstring("위험예고")] CPC_CONTROL_DANGER_NOTICE  = 3,
+    [helpstring("위험")]    CPC_CONTROL_DANGER         = 4,
+    """
+    return codemgr().GetStockControlKind(code)
