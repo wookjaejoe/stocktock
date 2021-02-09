@@ -1,3 +1,4 @@
+import abc
 import csv
 import logging
 import os
@@ -79,53 +80,62 @@ class Record:
     earning_price: int = 0
 
     def summit(self, logger, warren_session: WarrenSession):
-        msg = ', '.join([str(v) for v in list(self.__dict__.values())])
+        msg = ':dollar: ' + ', '.join([str(v) for v in list(self.__dict__.values())])
         warren_session.send(Message(msg))
         logger.critical(msg)
 
 
-class Simulator:
-    def __init__(self, name, stop_line=7):
+class Simulator(abc.ABC):
+    def __init__(self, name):
         self.name = name
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
-        self.stop_line_abs = abs(stop_line)
         self.warren_session = WarrenSession(name)
 
+    @abc.abstractmethod
     def run(self):
         ...
 
     def start(self):
-        threading.Thread(target=self.start_checking_stop_line).start()
-        threading.Thread(target=self.run).start()
+        def work():
+            while True:
+                self.logger.debug('# HEALTH CHECK #')
+                self.run()
+                time.sleep(3)
+                self.check_stop_line()
+                time.sleep(3)
 
-    def start_checking_stop_line(self):
-        while True:
-            self.logger.debug('# HEALTH CHECK #')
-            details: Dict[str, stocks.StockDetail2] = {
-                detail.code: detail for detail in
-                stocks.get_details([holding.code for holding in self.wallet.holdings])
-            }
+        threading.Thread(target=work).start()
 
-            for holding in self.wallet.holdings:
-                try:
-                    detail = details.get(holding.code)
+    def check_stop_line(self):
+        details: Dict[str, stocks.StockDetail2] = {
+            detail.code: detail for detail in
+            stocks.get_details([holding.code for holding in self.wallet.holdings])
+        }
 
-                    if not detail:
-                        logging.warning('The detail is null: ' + holding.code)
-                        continue
+        for holding in self.wallet.holdings:
+            try:
+                detail = details.get(holding.code)
 
-                    cur_price = detail.price
-                    earnings_rate = calc.earnings_ratio(holding.price, cur_price)
-                    if earnings_rate < -self.stop_line_abs or earnings_rate > self.stop_line_abs:
-                        self.try_sell(code=holding.code,
-                                      what=f'손익절 라인 {self.stop_line_abs}%',
-                                      order_price=detail.bid)
-                except:
-                    self.logger.debug(traceback.format_exc())
-                    self.logger.warning(f'Failed to get expected price for {holding.code}')
+                if not detail:
+                    logging.warning('The detail is null: ' + holding.code)
+                    continue
 
-            time.sleep(10)
+                cur_price = detail.price
+                earnings_rate = calc.earnings_ratio(holding.price, cur_price)
+                if earnings_rate < -5:
+                    # 손절
+                    self.try_sell(code=holding.code,
+                                  what=f'손절 -5%',
+                                  order_price=detail.bid)
+                elif earnings_rate > 7:
+                    # 익절
+                    self.try_sell(code=holding.code,
+                                  what=f'익절 7%',
+                                  order_price=detail.bid)
+            except:
+                self.logger.debug(traceback.format_exc())
+                self.logger.warning(f'Failed to get expected price for {holding.code}')
 
     def try_buy(self, code: str, what: str, order_price: int = None):
         if self.wallet.has(code):
@@ -175,29 +185,7 @@ class Simulator:
 
 
 # 취급 코드들
-available_codes = stocks.get_available()
-
-
-def init_available_codes():
-    global available_codes
-    details: Dict[str, stocks.StockDetail2] = {
-        detail.code: detail
-        for detail in stocks.get_details(available_codes)
-    }
-
-    # 정배열만 필터링
-    logging.debug(f'Filtering for straighhts...')
-    straights = []
-    for code, detail in details.items():
-        calculator = mas.get_calculator(detail.code)
-        if calculator.is_straight(detail.price):
-            straights.append(code)
-
-    available_codes = straights
-    logging.info(f'Available codes: {len(available_codes)}')
-
-
-init_available_codes()
+available_codes = stocks.get_availables()
 
 
 class Simulator_1(Simulator):
@@ -217,11 +205,8 @@ class Simulator_1(Simulator):
             return
 
         detail = list(stocks.get_details([event.code]))[0]
-        ma_calc = mas.get_calculator(event.code)
-        ma_20_cur = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
-        ma_20_prv = ma_calc.get(mas.MA.MA_20, pos=-1)
 
-        if event.category == 45 and ma_20_prv < ma_20_cur:
+        if event.category == 45:
             # 골든크로스 & 어제_20MA < 현재_20MA < 현재가
             self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.ask)
         elif event.category == 44:
@@ -232,7 +217,7 @@ class Simulator_1(Simulator):
         events.start()
 
     def start(self):
-        threading.Thread(target=self.start_checking_stop_line).start()
+        threading.Thread(target=self.check_stop_line).start()
         self.run()
 
 
@@ -245,30 +230,28 @@ class Simulator_2(Simulator):
         super().__init__('[2]5일선_상향돌파')
 
     def run(self):
-        while True:
-            self.logger.debug('# HEALTH CHECK #')
-            details = stocks.get_details(available_codes)
-            # 모든 취급 종목에 대해...
-            for detail in details:
-                try:
-                    # 5MA, 20MA 구한다
-                    ma_calc = mas.get_calculator(detail.code)
-                    ma_5 = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
-                    ma_20 = ma_calc.get(mas.MA.MA_20, cur_price=detail.price)
+        details = stocks.get_details(available_codes)
+        # 모든 취급 종목에 대해...
+        for detail in details:
+            try:
+                # 전일 기준 5MA, 20MA 구한다
+                ma_calc = mas.get_calculator(detail.code)
+                ma_5 = ma_calc.get(mas.MA.MA_5, pos=-1)
+                ma_20 = ma_calc.get(mas.MA.MA_20, pos=-1)
 
-                    if ma_20 < detail.open < ma_5 <= detail.price:
-                        # 시가 < 5MA & 20MA < 5MA <= 현재가
-                        self.try_buy(
-                            code=detail.code,
-                            what='[2]5일선_상향돌파',
-                            order_price=detail.ask
-                        )
-                except:
-                    logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
-
-            time.sleep(10)
+                if ma_20 < detail.open < ma_5 <= detail.price < ma_5 * 1.02:
+                    self.try_buy(
+                        code=detail.code,
+                        what='[2]5일선_상향돌파',
+                        order_price=detail.ask
+                    )
+            except:
+                logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
 
+####
+# DEPRECATED !!!
+####
 class Simulator_3(Simulator):
     """
     1번
@@ -278,31 +261,28 @@ class Simulator_3(Simulator):
         super().__init__('[1]MA60_120_하방터치')
 
     def run(self):
-        while True:
-            self.logger.debug('# HEALTH CHECK #')
+        # 취급 종목의 상세정보 구한다
+        details = stocks.get_details(available_codes)
+        for detail in details:
+            try:
+                # 본 종목의 60/120MA를 구한다
+                ma_calc = mas.get_calculator(detail.code)
+                ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=-1)
+                ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=-1)
 
-            # 취급 종목의 상세정보 구한다
-            details = stocks.get_details(available_codes)
-            for detail in details:
-                try:
-                    # 본 종목의 60/120MA를 구한다
-                    ma_calc = mas.get_calculator(detail.code)
-                    ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=detail.price)
-                    ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=detail.price)
+                if ma_60 <= detail.price <= ma_60 * 1.02:
+                    self.try_buy(
+                        code=detail.code,
+                        what='[1]60MA_하방터치',
+                        order_price=detail.ask
+                    )
+                elif ma_120 <= detail.price <= ma_120 * 1.02:
+                    self.try_buy(
+                        code=detail.code,
+                        what='[1]120MA_하방터치',
+                        order_price=detail.ask
+                    )
+            except:
+                logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
-                    if ma_60 <= detail.price <= ma_60 * 1.02:
-                        self.try_buy(
-                            code=detail.code,
-                            what='[1]60MA_하방터치',
-                            order_price=detail.ask
-                        )
-                    elif ma_120 <= detail.price <= ma_120 * 1.02:
-                        self.try_buy(
-                            code=detail.code,
-                            what='[1]120MA_하방터치',
-                            order_price=detail.ask
-                        )
-                except:
-                    logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
-
-            time.sleep(10)
+        time.sleep(10)
