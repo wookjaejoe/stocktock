@@ -90,13 +90,15 @@ class Simulator(abc.ABC):
         self.name = name
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
-        self.warren_session = WarrenSession(name)
+        self.warren_session: Optional[WarrenSession] = None
 
     @abc.abstractmethod
     def run(self):
         ...
 
     def start(self):
+        self.warren_session = WarrenSession(self.name)
+
         def work():
             while True:
                 self.logger.debug('# HEALTH CHECK #')
@@ -202,6 +204,8 @@ class Simulator_1(Simulator):
         super().__init__('[3]골든_데드_크로스')
 
     def on_event(self, event: events.Event):
+        logging.debug(f'{event.code} {event.category}')
+
         # 골든/데드 크로스 아닌 이벤트는 무시
         if event.category in [44, 45]:
             return
