@@ -2,9 +2,9 @@ import abc
 import csv
 import logging
 import os
+import sys
 import threading
 import time
-import traceback
 from dataclasses import dataclass
 from typing import *
 
@@ -100,10 +100,19 @@ class Simulator(abc.ABC):
         def work():
             while True:
                 self.logger.debug('# HEALTH CHECK #')
-                self.run()
-                time.sleep(3)
-                self.check_stop_line()
-                time.sleep(3)
+                try:
+                    self.run()
+                except:
+                    self.logger.error('An error occured while running the simulation.', exc_info=sys.exc_info())
+
+                time.sleep(5)
+
+                try:
+                    self.check_stop_line()
+                except:
+                    self.logger.error('An error occured while checking stop line.', exc_info=sys.exc_info())
+
+                time.sleep(5)
 
         threading.Thread(target=work).start()
 
@@ -114,28 +123,24 @@ class Simulator(abc.ABC):
         }
 
         for holding in self.wallet.holdings:
-            try:
-                detail = details.get(holding.code)
+            detail = details.get(holding.code)
 
-                if not detail:
-                    logging.warning('The detail is null: ' + holding.code)
-                    continue
+            if not detail:
+                logging.warning('The detail is null: ' + holding.code)
+                continue
 
-                cur_price = detail.price
-                earnings_rate = calc.earnings_ratio(holding.price, cur_price)
-                if earnings_rate < -5:
-                    # 손절
-                    self.try_sell(code=holding.code,
-                                  what=f'손절 -5%',
-                                  order_price=detail.bid)
-                elif earnings_rate > 7:
-                    # 익절
-                    self.try_sell(code=holding.code,
-                                  what=f'익절 7%',
-                                  order_price=detail.bid)
-            except:
-                self.logger.debug(traceback.format_exc())
-                self.logger.warning(f'Failed to get expected price for {holding.code}')
+            cur_price = detail.price
+            earnings_rate = calc.earnings_ratio(holding.price, cur_price)
+            if earnings_rate < -5:
+                # 손절
+                self.try_sell(code=holding.code,
+                              what=f'손절 -5%',
+                              order_price=detail.bid)
+            elif earnings_rate > 7:
+                # 익절
+                self.try_sell(code=holding.code,
+                              what=f'익절 7%',
+                              order_price=detail.bid)
 
     def try_buy(self, code: str, what: str, order_price: int = None):
         if self.wallet.has(code):

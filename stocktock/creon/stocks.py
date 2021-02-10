@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from retry import retry
+
 from creon import mas
 from .com import *
 
@@ -171,6 +173,7 @@ def is_kos(code):
     return False
 
 
+@retry(tries=3, delay=5)
 @limit_safe(ReqType.NON_TRADE)
 def get_detail(code: str) -> StockDetail:
     _stockmst = stockmst()
