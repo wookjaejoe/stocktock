@@ -137,12 +137,12 @@ class Simulator(abc.ABC):
                 # 손절
                 self.try_sell(code=holding.code,
                               what=f'손절 -5%',
-                              order_price=detail.bid)
+                              order_price=detail.price)
             elif earnings_rate > 7:
                 # 익절
                 self.try_sell(code=holding.code,
                               what=f'익절 7%',
-                              order_price=detail.bid)
+                              order_price=detail.price)
 
     def try_buy(self, code: str, what: str, order_price: int = None):
         if self.wallet.has(code):
@@ -217,9 +217,9 @@ class Simulator_1(Simulator):
 
         if event.category == 45:
             # 골든크로스 & 어제_20MA < 현재_20MA < 현재가
-            self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.ask)
+            self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.price)
         elif event.category == 44:
-            self.try_sell(code=event.code, what='[3-46]데드크로스', order_price=detail.bid)
+            self.try_sell(code=event.code, what='[3-46]데드크로스', order_price=detail.price)
 
     def run(self):
         events.subscribe(self.on_event)
@@ -252,7 +252,7 @@ class Simulator_2(Simulator):
                     self.try_buy(
                         code=detail.code,
                         what='[2]5일선_상향돌파',
-                        order_price=detail.ask
+                        order_price=detail.price
                     )
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
@@ -283,13 +283,13 @@ class Simulator_3(Simulator):
                     self.try_buy(
                         code=detail.code,
                         what='[1]60MA_하방터치',
-                        order_price=detail.ask
+                        order_price=detail.price
                     )
                 elif ma_120 <= detail.price <= ma_120 * 1.02:
                     self.try_buy(
                         code=detail.code,
                         what='[1]120MA_하방터치',
-                        order_price=detail.ask
+                        order_price=detail.price
                     )
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
