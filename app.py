@@ -11,7 +11,7 @@ from utils import log
 
 log.init(logging.DEBUG)
 
-from simulators import simulators
+from simulation import simulators
 
 
 def main():

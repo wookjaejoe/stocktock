@@ -111,7 +111,7 @@ ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 _availables = None
 
 
-def get_availables() -> List[str]:
+def get_availables(straight=True) -> List[str]:
     """
     임시 코드 - 시가 총액 2000억 ~ 10000억
     """
@@ -127,11 +127,6 @@ def get_availables() -> List[str]:
                        get_control_kind(stock.code) == 0 and
                        get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST]
 
-    # 시가 총액 기반 필터링
-    logging.info('Filtering with capitalizations...')
-    available_codes = [detail.code for detail in get_details(available_codes) if
-                       2000_0000_0000 < detail.capitalization() < 2_0000_0000_0000]
-
     # 디테일 생성
     logging.info(f'Make details for {len(available_codes)} stocks...')
     details: Dict[str, StockDetail2] = {
@@ -139,15 +134,18 @@ def get_availables() -> List[str]:
         for detail in get_details(available_codes)
     }
 
-    # 정배열 필터링
-    logging.info(f'Filtering with straighhts...')
-    straights = []
-    for code, detail in details.items():
-        calculator = mas.get_calculator(detail.code)
-        if calculator.is_straight():
-            straights.append(code)
+    # 시가 총액 기반 필터링
+    logging.info('Filtering with capitalizations...')
+    details = {code: detail for code, detail in details.items() if
+               2000_0000_0000 < detail.capitalization() < 2_0000_0000_0000}
 
-    _availables = straights
+    if straight:
+        # 정배열 필터링
+        logging.info(f'Filtering with straighhts...')
+        _availables = [code for code, detail in details.items() if mas.get_calculator(detail.code).is_straight()]
+    else:
+        _availables = [detail for detail in details.keys()]
+
     logging.info(f'Finished filtering - final availables: {len(_availables)}')
     return _availables
 

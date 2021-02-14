@@ -49,11 +49,9 @@ def _create_file_handler(level=logging.DEBUG):
     return file_handler
 
 
-logging.basicConfig(datefmt=DATE_FORMAT,
-                    level=logging.NOTSET)
-
-
 def init(level=logging.INFO):
+    logging.basicConfig(datefmt=DATE_FORMAT,
+                        level=level)
     root_logger = logging.getLogger()
     root_logger.handlers = [_create_stream_handler(level=level),
                             _create_file_handler(level=level)]

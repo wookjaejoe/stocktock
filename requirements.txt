@@ -13,3 +13,5 @@ pykiwoom
 kiwoom
 retry
 jsons
+pykrx
+finance-datareader

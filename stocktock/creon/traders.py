@@ -9,12 +9,6 @@ from typing import *
 import win32com.client
 
 from creon import stocks
-from utils.slack import WarrenSession
-
-warren_enabled = False
-
-if warren_enabled:
-    warren_session = WarrenSession()
 
 all_stocks = stocks.get_all(stocks.MarketType.EXCHANGE) + stocks.get_all(stocks.MarketType.KOSDAQ)
 td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
