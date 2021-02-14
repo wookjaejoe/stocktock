@@ -12,6 +12,10 @@ from creon import events, stocks, mas
 from utils import calc
 from utils.slack import WarrenSession, Message
 
+# 취급 코드들
+available_codes = stocks.get_availables()
+available_codes = [code for code in available_codes if mas.get_calculator(code).is_straight()]
+
 
 @dataclass
 class Holding:
@@ -189,10 +193,6 @@ class Simulator(abc.ABC):
             earning_price=order_total - holding_total,
             earning_rate=calc.earnings_ratio(holding.price, order_price)
         ).summit(logger=self.logger, warren_session=self.warren_session)
-
-
-# 취급 코드들
-available_codes = stocks.get_availables()
 
 
 class Simulator_1(Simulator):

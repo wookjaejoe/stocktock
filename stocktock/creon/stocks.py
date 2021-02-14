@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from retry import retry
 
-from creon import mas
 from .com import *
 
 
@@ -111,7 +110,7 @@ ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 _availables = None
 
 
-def get_availables(straight=True) -> List[str]:
+def get_availables() -> List[str]:
     """
     임시 코드 - 시가 총액 2000억 ~ 10000억
     """
@@ -139,13 +138,7 @@ def get_availables(straight=True) -> List[str]:
     details = {code: detail for code, detail in details.items() if
                2000_0000_0000 < detail.capitalization() < 2_0000_0000_0000}
 
-    if straight:
-        # 정배열 필터링
-        logging.info(f'Filtering with straighhts...')
-        _availables = [code for code, detail in details.items() if mas.get_calculator(detail.code).is_straight()]
-    else:
-        _availables = [detail for detail in details.keys()]
-
+    _availables = list(details.keys())
     logging.info(f'Finished filtering - final availables: {len(_availables)}')
     return _availables
 
