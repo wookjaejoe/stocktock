@@ -26,6 +26,7 @@ class Holding:
 
 
 BUY_LIMIT = 200_0000
+SEED = 1_0000_0000
 
 
 class Wallet:
@@ -42,7 +43,15 @@ class Wallet:
                 return holding
 
     def buy(self, dt: datetime, code, count, price):
+        global SEED
+        total = count * price
+
+        if total > SEED:
+            logger.critical(f'시드부족. 남은현찰: {SEED}')
+            return
+
         self.holdings.append(Holding(code, count, price))
+        SEED -= total
         tokens = [
             dt,  # 주문시각
             'BUY',  # 구분
@@ -50,15 +59,17 @@ class Wallet:
             stocks.get_name(code),  # 종목명
             price,  # 주문가
             count,  # 주문수량
-            price * count,  # 주문총액
+            total,  # 주문총액
             'N/A',  # 수익율
             'N/A',  # 수익금
-            count  # 잔여수량
+            count,  # 잔여수량
+            SEED  # 남은 시드
         ]
 
         logger.critical(', '.join([str(token) for token in tokens]))
 
     def sell(self, dt: datetime, code, sell_price, sell_amount: float):
+        global SEED
         holding = self.get(code)
 
         # 매도 수량 계산
@@ -70,6 +81,7 @@ class Wallet:
             # 전량 매도
             self.holdings.remove(holding)
 
+        SEED += sell_price * sell_count
         tokens = [
             dt,  # 시각
             'SELL',  # 구분
@@ -80,7 +92,8 @@ class Wallet:
             sell_price * sell_count,  # 주문총액
             calc.earnings_ratio(holding.price, sell_price),  # 수익율
             sell_price * sell_count - holding.price * sell_count,  # 수익금
-            holding.count  # 잔여수량
+            holding.count,  # 잔여수량
+            SEED  # 남은 시드
         ]
 
         logger.critical(', '.join([str(token) for token in tokens]))
@@ -116,6 +129,7 @@ class BreakAbove5MaEventPublisher:
 
         self.daily_candles: Dict[date, charts.ChartData] = {candle.datetime.date(): candle
                                                             for candle in self.daily_candles}
+        self.last_candle: charts.ChartData = None
 
     def ma(self, dt: date, length: int):
         closes = [candle.close for candle in self.daily_candles.values()
@@ -140,8 +154,17 @@ class BreakAbove5MaEventPublisher:
 
     def start(self):
         self.candle_provider.start()
+        self.on_finished()
+
+    def on_finished(self):
+        if self.last_candle and self.wallet.has(self.code):
+            self.wallet.sell(dt=self.last_candle.datetime,
+                             code=self.last_candle.code,
+                             sell_price=self.last_candle.close,
+                             sell_amount=1)
 
     def check_break_above_5ma(self, candle: charts.ChartData):
+        self.last_candle = candle
         ma_5 = self.ma_5(candle.datetime.date() - timedelta(days=1))
         ma_20 = self.ma_20(candle.datetime.date() - timedelta(days=1))
         ma_60 = self.ma_60(candle.datetime.date() - timedelta(days=1))
@@ -160,10 +183,11 @@ class BreakAbove5MaEventPublisher:
             earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
 
             # 손절 체크
-            if earnings_rate < -3:
+            if earnings_rate < -5:
                 # 손절라인 -3%: 모두 매도
                 self.wallet.sell(candle.datetime, self.code, sell_price=cur_price, sell_amount=1)
 
+            sell_amount = 0
             # 익절 체크
             if earnings_rate > 7:
                 if holding.max_price * 0.97 > cur_price:
@@ -182,12 +206,17 @@ class BreakAbove5MaEventPublisher:
                     holding.is_7_beneath = True
                 else:
                     sell_amount = 0
+            elif holding.is_7_beneath:
+                # 7% 작은데, 7% 찍은적이 있다? 그럼 다 팔아
+                sell_amount = 0
+            else:
+                pass
 
-                if sell_amount:
-                    self.wallet.sell(candle.datetime,
-                                     self.code,
-                                     sell_price=cur_price,
-                                     sell_amount=sell_amount)
+            if sell_amount:
+                self.wallet.sell(candle.datetime,
+                                 self.code,
+                                 sell_price=cur_price,
+                                 sell_amount=sell_amount)
 
             # TODO: 넣을지 말지 확인
             # candle_time = candle.datetime.time()
