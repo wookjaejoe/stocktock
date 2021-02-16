@@ -136,7 +136,7 @@ def get_availables() -> List[str]:
     # 시가 총액 기반 필터링
     logging.info('Filtering with capitalizations...')
     details = {code: detail for code, detail in details.items() if
-               2000_0000_0000 < detail.capitalization() < 2_0000_0000_0000}
+               1000_0000_0000 < detail.capitalization() < 5_0000_0000_0000}
 
     _availables = list(details.keys())
     logging.info(f'Finished filtering - final availables: {len(_availables)}')
