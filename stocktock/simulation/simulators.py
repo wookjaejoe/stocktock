@@ -80,11 +80,11 @@ class Record:
     order_price: int
     order_count: int
     total: int
-    earning_rate: float = 0
-    earning_price: int = 0
+    earning_rate: float = None
+    earning_price: int = None
 
     def summit(self, logger, warren_session: WarrenSession):
-        msg = ':dollar: ' + ', '.join([str(v) for v in list(self.__dict__.values())])
+        msg = ':dollar: ' + ', '.join(['N/A' if v is None else str(v) for v in list(self.__dict__.values())])
         warren_session.send(Message(msg))
         logger.critical(msg)
 

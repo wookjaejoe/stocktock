@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from typing import *
 
-from simulators import simulators
+from simulation import simulators
 from creon import stocks
 from utils import calc
 

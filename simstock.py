@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
@@ -19,6 +20,9 @@ class Holding:
     code: str
     count: int
     price: int
+    is_7_beneath: bool = False
+    is_12_beneath: bool = False
+    max_price: int = 0
 
 
 BUY_LIMIT = 200_0000
@@ -37,40 +41,49 @@ class Wallet:
             if code == holding.code:
                 return holding
 
-    # 로그: 시각, 주문타입, 종목코드, 종목명, 주문가, 주문수량, 주문총액, 수익율, 수익금
     def buy(self, dt: datetime, code, count, price):
-        tokens = [
-            dt,
-            'BUY',
-            code,
-            stocks.get_name(code),
-            price,
-            count,
-            price * count, 0, 0
-        ]
-
-        logger.critical(', '.join([str(token) for token in tokens]))
         self.holdings.append(Holding(code, count, price))
-
-    def sell(self, dt: datetime, code, sell_price):
-        holding = self.get(code)
-        earning_rate = calc.earnings_ratio(holding.price, sell_price)
-
         tokens = [
-            dt,
-            'SELL',
-            code,
-            stocks.get_name(code),
-            sell_price,
-            holding.count,
-            sell_price * holding.count,
-            earning_rate,
-            sell_price * holding.count - holding.price * holding.count,
-            len(self.holdings)
+            dt,  # 주문시각
+            'BUY',  # 구분
+            code,  # 종목코드
+            stocks.get_name(code),  # 종목명
+            price,  # 주문가
+            count,  # 주문수량
+            price * count,  # 주문총액
+            'N/A',  # 수익율
+            'N/A',  # 수익금
+            count  # 잔여수량
         ]
 
         logger.critical(', '.join([str(token) for token in tokens]))
-        self.holdings.remove(self.get(code))
+
+    def sell(self, dt: datetime, code, sell_price, sell_amount: float):
+        holding = self.get(code)
+
+        # 매도 수량 계산
+        sell_count = math.ceil(holding.count * sell_amount)
+
+        # 보유 수량에서 매도 수량 만큼 차감
+        holding.count = holding.count - sell_count
+        if holding.count == 0:
+            # 전량 매도
+            self.holdings.remove(holding)
+
+        tokens = [
+            dt,  # 시각
+            'SELL',  # 구분
+            code,  # 종목코드
+            stocks.get_name(code),  # 종목명
+            sell_price,  # 주문가
+            sell_count,  # 주문수량
+            sell_price * sell_count,  # 주문총액
+            calc.earnings_ratio(holding.price, sell_price),  # 수익율
+            sell_price * sell_count - holding.price * sell_count,  # 수익금
+            holding.count  # 잔여수량
+        ]
+
+        logger.critical(', '.join([str(token) for token in tokens]))
 
 
 class NotEnoughChartException(BaseException):
@@ -137,18 +150,51 @@ class BreakAbove5MaEventPublisher:
         cur_price = candle.close
         daily_candle = self.daily_candles.get(candle.datetime.date())
 
-        if self.wallet.has(code=self.code):
-            earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
-            candle_time = candle.datetime.time()
-            if earnings_rate > 7:
-                self.wallet.sell(candle.datetime, self.code, sell_price=cur_price)
-            elif earnings_rate < -5:
-                self.wallet.sell(candle.datetime, self.code, sell_price=cur_price)
+        if self.wallet.has(code=self.code):  # 보유 종목에 대한 매도 판단
+            holding = self.wallet.get(self.code)
 
-            elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
-                # 장종료전에 마감해보자
-                self.wallet.sell(candle.datetime, self.code, cur_price)
-        else:
+            # max 갱신
+            holding.max_price = max(holding.max_price, cur_price)
+
+            # 수익율 계산
+            earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
+
+            # 손절 체크
+            if earnings_rate < -3:
+                # 손절라인 -3%: 모두 매도
+                self.wallet.sell(candle.datetime, self.code, sell_price=cur_price, sell_amount=1)
+
+            # 익절 체크
+            if earnings_rate > 7:
+                if holding.max_price * 0.97 > cur_price:
+                    # max * 0.97 > 현재가: 모두 매도
+                    sell_amount = 1
+                elif earnings_rate > 15:
+                    # 익절라인 15%: 모두 매도
+                    sell_amount = 1
+                elif not holding.is_7_beneath and earnings_rate > 12:
+                    # 익절라인 12%: 2/3 매도
+                    sell_amount = 2 / 3
+                    holding.is_12_beneath = True
+                elif not holding.is_7_beneath:
+                    # 익절라인 7%: 1/3 매도
+                    sell_amount = 1 / 3
+                    holding.is_7_beneath = True
+                else:
+                    sell_amount = 0
+
+                if sell_amount:
+                    self.wallet.sell(candle.datetime,
+                                     self.code,
+                                     sell_price=cur_price,
+                                     sell_amount=sell_amount)
+
+            # TODO: 넣을지 말지 확인
+            # candle_time = candle.datetime.time()
+            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
+            #     # 장종료전에 마감해보자
+            #     self.wallet.sell(candle.datetime, self.code, cur_price)
+        else:  # 미보유 종목에 대한 매수 판단
             # 정배열 판단 & daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02
             if ma_120 < ma_60 < ma_20 < daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
