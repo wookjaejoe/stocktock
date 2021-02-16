@@ -14,6 +14,9 @@ from creon import charts, stocks
 
 logger = logging.getLogger()
 
+available_codes = stocks.get_availables()
+details: Dict[str, stocks.StockDetail2] = {detail.code: detail for detail in stocks.get_details(available_codes)}
+
 
 @dataclass
 class Holding:
@@ -56,6 +59,7 @@ class Wallet:
             dt,  # 주문시각
             'BUY',  # 구분
             code,  # 종목코드
+            details.get(code).capitalization(),
             stocks.get_name(code),  # 종목명
             price,  # 주문가
             count,  # 주문수량
@@ -87,6 +91,7 @@ class Wallet:
             'SELL',  # 구분
             code,  # 종목코드
             stocks.get_name(code),  # 종목명
+            details.get(code).capitalization(),  #
             sell_price,  # 주문가
             sell_count,  # 주문수량
             sell_price * sell_count,  # 주문총액
@@ -231,7 +236,6 @@ class BreakAbove5MaEventPublisher:
 
 def main():
     start_time = time.time()
-    available_codes = stocks.get_availables()
 
     count = 0
     for code in available_codes:
