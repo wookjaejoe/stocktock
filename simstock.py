@@ -192,7 +192,7 @@ class BreakAbove5MaEventPublisher:
             # 손절 체크
             if earnings_rate < -4:
                 # 손절라인
-                self.wallet.sell(candle.datetime, self.code, sell_price=cur_price, sell_amount=1)
+                sell_amount = 1
             # 익절 체크
             elif earnings_rate > 5:
                 if holding.max_price * 0.97 > cur_price:
