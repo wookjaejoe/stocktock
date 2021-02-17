@@ -15,6 +15,8 @@ from creon import charts, stocks
 logger = logging.getLogger()
 
 available_codes = stocks.get_availables()
+available_codes = [code for code in available_codes if stocks.get_capital_type(code) == 3]
+
 details: Dict[str, stocks.StockDetail2] = {detail.code: detail for detail in stocks.get_details(available_codes)}
 
 
@@ -28,7 +30,7 @@ class Holding:
     max_price: int = 0
 
 
-BUY_LIMIT = 200_0000
+BUY_LIMIT = 100_0000
 SEED = 1_0000_0000
 
 
@@ -123,7 +125,7 @@ class BreakAbove5MaEventPublisher:
         self.daily_candles: List[charts.ChartData] = charts.request_by_term(
             code=code,
             chart_type=charts.ChartType.DAY,
-            begin=begin - timedelta(days=250),
+            begin=begin - timedelta(days=200),
             end=end
         )
 
@@ -213,7 +215,7 @@ class BreakAbove5MaEventPublisher:
                     sell_amount = 0
             elif holding.is_7_beneath:
                 # 7% 작은데, 7% 찍은적이 있다? 그럼 다 팔아
-                sell_amount = 0
+                sell_amount = 1
             else:
                 pass
 
@@ -240,13 +242,14 @@ def main():
     count = 0
     for code in available_codes:
         count += 1
-        logger.info(f'[{count}/{len(available_codes)}] {stocks.get_name(code)}')
+        logger.info(
+            f'[{count}/{len(available_codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 
         ep = None
         try:
             ep = BreakAbove5MaEventPublisher(code,
                                              begin=date(year=2020, month=8, day=1),
-                                             end=date.today())
+                                             end=date(year=2021, month=2, day=14))
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))

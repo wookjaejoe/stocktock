@@ -110,7 +110,7 @@ ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 _availables = None
 
 
-def get_availables() -> List[str]:
+def get_availables(capit_min: int = 0, capit_max: int = 0) -> List[str]:
     """
     임시 코드 - 시가 총액 2000억 ~ 10000억
     """
@@ -135,8 +135,12 @@ def get_availables() -> List[str]:
 
     # 시가 총액 기반 필터링
     logging.info('Filtering with capitalizations...')
-    details = {code: detail for code, detail in details.items() if
-               1000_0000_0000 < detail.capitalization() < 5_0000_0000_0000}
+    if capit_min:
+        details = {code: detail for code, detail in details.items() if
+                   capit_min < detail.capitalization()}
+    if capit_max:
+        details = {code: detail for code, detail in details.items() if
+                   detail.capitalization() < capit_max}
 
     _availables = list(details.keys())
     logging.info(f'Finished filtering - final availables: {len(_availables)}')

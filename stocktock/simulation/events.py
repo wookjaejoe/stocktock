@@ -33,18 +33,18 @@ class PastMinuteCandleProvdider(EventPublisher):
 
         while not self.stopped:
             end = begin + timedelta(days=7)
+            if end > self.end:
+                end = self.end
+                self.stopped = True
+
             chart = charts.request_by_term(code=self.code, chart_type=charts.ChartType.MINUTES, begin=begin, end=end)
             for candle in chart:
                 self._publish(candle)
-
-            if end > self.end:
-                break
 
             begin = end + timedelta(days=1)
 
     def stop(self):
         self.stopped = True
-
 
     def _publish(self, candle: charts.ChartData):
         for subscriber in self.subscribers:
