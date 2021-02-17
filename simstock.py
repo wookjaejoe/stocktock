@@ -25,8 +25,8 @@ class Holding:
     code: str
     count: int
     price: int
-    is_7_beneath: bool = False
-    is_12_beneath: bool = False
+    is_5_beneath: bool = False
+    is_10_beneath: bool = False
     max_price: int = 0
 
 
@@ -190,30 +190,29 @@ class BreakAbove5MaEventPublisher:
             earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
 
             # 손절 체크
-            if earnings_rate < -5:
-                # 손절라인 -3%: 모두 매도
+            if earnings_rate < -4:
+                # 손절라인
                 self.wallet.sell(candle.datetime, self.code, sell_price=cur_price, sell_amount=1)
-
             # 익절 체크
-            if earnings_rate > 7:
+            elif earnings_rate > 5:
                 if holding.max_price * 0.97 > cur_price:
                     # max * 0.97 > 현재가: 모두 매도
                     sell_amount = 1
                 elif earnings_rate > 15:
-                    # 익절라인 15%: 모두 매도
+                    # 익절라인
                     sell_amount = 1
-                elif not holding.is_12_beneath and earnings_rate > 12:
+                elif not holding.is_10_beneath and earnings_rate > 10:
                     # 익절라인 12%: 2/3 매도
                     sell_amount = 1 / 2
-                    holding.is_12_beneath = True
-                elif not holding.is_7_beneath:
-                    # 익절라인 7%: 1/3 매도
+                    holding.is_10_beneath = True
+                elif not holding.is_5_beneath:
+                    # 익절라인 5%: 1/3 매도
                     sell_amount = 1 / 3
-                    holding.is_7_beneath = True
+                    holding.is_5_beneath = True
                 else:
                     sell_amount = 0
-            elif holding.is_7_beneath:
-                # 7% 작은데, 7% 찍은적이 있다? 그럼 다 팔아
+            elif holding.is_5_beneath:
+                # 5% 작은데, 5% 찍은적이 있다? 그럼 다 팔아
                 sell_amount = 1
             else:
                 sell_amount = 0
