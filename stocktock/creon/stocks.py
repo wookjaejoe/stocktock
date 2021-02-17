@@ -339,30 +339,6 @@ def get_yesterday_close(code: str):
     return codemgr().GetStockYdClosePrice(code)
 
 
-@limit_safe(ReqType.NON_TRADE)
-def get_trend(code: str) -> Generator[StockTrend, None, None]:
-    stockweek = win32com.client.Dispatch("DsCbo1.StockWeek")
-    stockweek.SetInputValue(0, code)
-    stockweek.BlockRequest()
-
-    req_status = stockweek.GetDibStatus()
-    req_msg = stockweek.GetDibMsg1()
-    assert req_status == 0, f'Request Failure: ({req_status}) {req_msg}'
-
-    # 일자별 정보 데이터 처리
-    count = stockweek.GetHeaderValue(1)  # 데이터 개수
-    for i in range(count):
-        yield StockTrend(
-            date=stockweek.GetDataValue(0, i),  # 일자
-            open_=stockweek.GetDataValue(1, i),  # 시가
-            high=stockweek.GetDataValue(2, i),  # 고가
-            low=stockweek.GetDataValue(3, i),  # 저가
-            close=stockweek.GetDataValue(4, i),  # 종가
-            diff=stockweek.GetDataValue(5, i),  # ?
-            vol=stockweek.GetDataValue(6, i),  # ?
-        )
-
-
 def get_supervision(code: str):
     """
     0: 일반종목
