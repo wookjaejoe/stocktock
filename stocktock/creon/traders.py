@@ -1,14 +1,12 @@
 import logging
 import threading
-import time
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import *
 
 import win32com.client
 
 from creon import stocks
+from creon.com import *
 
 all_stocks = stocks.get_all(stocks.MarketType.EXCHANGE) + stocks.get_all(stocks.MarketType.KOSDAQ)
 td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
@@ -71,6 +69,7 @@ class VirtualOrder:
         self.total_price = self.order_price * self.order_count
 
 
+@limit_safe(req_type=ReqType.TRADE)
 def _order(order_type: OrderType, code: str, price: int, count: int):
     acc = td_util.AccountNumber[0]  # 계좌번호
     accFlag = td_util.GoodsList(acc, 1)  # 주식상품 구분
@@ -88,15 +87,16 @@ def _order(order_type: OrderType, code: str, price: int, count: int):
     # 만약 4를 리턴받은 경우는 15초동안 호출 제한을 초과한 경우로 잠시 후 다시 요청이 필요 합니다.
     # assert ret == 0, f'주문 요청 오류({ret})'  # 0: 정상,  그 외 오류, 4: 주문요청제한 개수 초과
     if ret == 4:
-        time.sleep(30)
+        time.sleep(20)
         _order(order_type, code, price, count)
 
     rqStatus = objStockOrder.GetDibStatus()
     errMsg = objStockOrder.GetDibMsg1()
-    assert rqStatus == 0, f'주문 실패({rqStatus}) - {errMsg}'
-    ### todo: 미체결 방어
-
-    logging.info(f'ORDER COMPLETE - {order_type.value}, {code}, {price}, {count}')
+    if rqStatus == 0:
+        logging.info(f'ORDER COMPLETE - {order_type.value}, {code}, {price}, {count}')
+    else:
+        ### todo: 미체결 방어
+        logging.error(f'주문 실패({rqStatus}) - {errMsg}')
 
 
 def _buy(code: str, count: int):
@@ -151,14 +151,6 @@ def order_list():
         # 연속 처리 체크 - 다음 데이터가 없으면 중지
         if not td_9065.Continue:
             break
-
-
-def get_stock_name(code: str):
-    for stock in all_stocks:
-        if stock.code == code:
-            return stock.name
-
-    return None
 
 
 class Trader:
