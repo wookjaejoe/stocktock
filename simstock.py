@@ -194,7 +194,6 @@ class BreakAbove5MaEventPublisher:
                 # 손절라인 -3%: 모두 매도
                 self.wallet.sell(candle.datetime, self.code, sell_price=cur_price, sell_amount=1)
 
-            sell_amount = 0
             # 익절 체크
             if earnings_rate > 7:
                 if holding.max_price * 0.97 > cur_price:
@@ -203,9 +202,9 @@ class BreakAbove5MaEventPublisher:
                 elif earnings_rate > 15:
                     # 익절라인 15%: 모두 매도
                     sell_amount = 1
-                elif not holding.is_7_beneath and earnings_rate > 12:
+                elif not holding.is_12_beneath and earnings_rate > 12:
                     # 익절라인 12%: 2/3 매도
-                    sell_amount = 2 / 3
+                    sell_amount = 1 / 2
                     holding.is_12_beneath = True
                 elif not holding.is_7_beneath:
                     # 익절라인 7%: 1/3 매도
@@ -217,7 +216,7 @@ class BreakAbove5MaEventPublisher:
                 # 7% 작은데, 7% 찍은적이 있다? 그럼 다 팔아
                 sell_amount = 1
             else:
-                pass
+                sell_amount = 0
 
             if sell_amount:
                 self.wallet.sell(candle.datetime,
