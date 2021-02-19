@@ -29,12 +29,12 @@ class Holding:
 
 
 BUY_LIMIT = 100_0000
-SEED = 1_0000_0000
 
 
 class Wallet:
 
     def __init__(self):
+        self.earnings = 0
         self.holdings: List[Holding] = []
 
     def has(self, code):
@@ -46,15 +46,9 @@ class Wallet:
                 return holding
 
     def buy(self, dt: datetime, code, count, price):
-        global SEED
         total = count * price
 
-        if total > SEED:
-            logger.critical(f'시드부족. 남은현찰: {SEED}')
-            return
-
         self.holdings.append(Holding(code, count, price))
-        SEED -= total
         tokens = [
             dt,  # 주문시각
             'BUY',  # 구분
@@ -67,13 +61,11 @@ class Wallet:
             'N/A',  # 수익율
             'N/A',  # 수익금
             count,  # 잔여수량
-            SEED  # 남은 시드
         ]
 
         logger.critical(', '.join([str(token) for token in tokens]))
 
     def sell(self, dt: datetime, code, sell_price, sell_amount: float):
-        global SEED
         holding = self.get(code)
 
         # 매도 수량 계산
@@ -85,7 +77,8 @@ class Wallet:
             # 전량 매도
             self.holdings.remove(holding)
 
-        SEED += sell_price * sell_count
+        earnings = sell_price * sell_count - holding.price * sell_count
+        self.earnings += earnings
         tokens = [
             dt,  # 시각
             'SELL',  # 구분
@@ -96,9 +89,8 @@ class Wallet:
             sell_count,  # 주문수량
             sell_price * sell_count,  # 주문총액
             calc.earnings_ratio(holding.price, sell_price),  # 수익율
-            sell_price * sell_count - holding.price * sell_count,  # 수익금
+            earnings,  # 수익금
             holding.count,  # 잔여수량
-            SEED  # 남은 시드
         ]
 
         logger.critical(', '.join([str(token) for token in tokens]))
@@ -119,7 +111,7 @@ class BreakAbove5MaEventPublisher:
         self.wallet = Wallet()
         self.code = code
         self.candle_provider = simulation.events.PastMinuteCandleProvdider(code, begin, end)
-        self.candle_provider.subscribers.append(self.check_break_above_5ma)
+        self.candle_provider.subscribers.append(self.on_candle)
         self.daily_candles: List[charts.ChartData] = charts.request_by_term(
             code=code,
             chart_type=charts.ChartType.DAY,
@@ -168,7 +160,20 @@ class BreakAbove5MaEventPublisher:
                              sell_price=self.last_candle.close,
                              sell_amount=1)
 
-    def check_break_above_5ma(self, candle: charts.ChartData):
+        detail = details.get(self.code)
+
+        if self.wallet.earnings:
+            final_msg_items = [
+                '###',
+                self.code,
+                detail.name,
+                detail.capitalization(),
+                self.wallet.earnings
+            ]
+
+            logger.critical(', '.join([str(item) for item in final_msg_items]))
+
+    def on_candle(self, candle: charts.ChartData):
         self.last_candle = candle
         ma_5 = self.ma_5(candle.datetime.date() - timedelta(days=1))
         ma_20 = self.ma_20(candle.datetime.date() - timedelta(days=1))
@@ -233,7 +238,6 @@ class BreakAbove5MaEventPublisher:
 
 
 def main(codes: List[str]):
-    codes = codes[:100]
     start_time = time.time()
 
     count = 0
@@ -245,8 +249,8 @@ def main(codes: List[str]):
         ep = None
         try:
             ep = BreakAbove5MaEventPublisher(code,
-                                             begin=date(year=2020, month=10, day=1),
-                                             end=date(year=2021, month=12, day=31))
+                                             begin=date(year=2020, month=8, day=1),
+                                             end=date(year=2021, month=10, day=30))
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))
@@ -259,10 +263,4 @@ def main(codes: List[str]):
 
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
-    # 2000억 이하
-    main([code for code in available_codes if details.get(code).capitalization() < 2000_0000_0000])
-    # 시총 중간
-    mid = int(len(available_codes) / 2)
-    main([code for code in available_codes][mid - 80:mid + 80])
-    # 시총 상위
-    main([code for code in available_codes][-100:])
+    main(available_codes)
