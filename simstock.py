@@ -119,6 +119,9 @@ class BreakAbove5MaEventPublisher:
             end=end
         )
 
+        if not self.daily_candles:
+            raise NotEnoughChartException(code, details.get(code).name)
+
         self.daily_candles.sort(key=lambda candle: candle.datetime)
 
         if not self.daily_candles[0].datetime.date() < begin < self.daily_candles[-1].datetime.date():
@@ -250,7 +253,7 @@ def main(codes: List[str]):
         try:
             ep = BreakAbove5MaEventPublisher(code,
                                              begin=date(year=2020, month=8, day=1),
-                                             end=date(year=2021, month=10, day=30))
+                                             end=date(year=2020, month=10, day=30))
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))
@@ -263,4 +266,4 @@ def main(codes: List[str]):
 
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
-    main(available_codes)
+    main([code for code in available_codes if available_codes.index(code) % 5 == 0][:200])
