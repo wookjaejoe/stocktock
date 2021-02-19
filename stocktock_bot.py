@@ -4,6 +4,8 @@ import os
 import sys
 import time
 
+from creon import stocks, mas
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(basedir, 'stocktock'))
 
@@ -15,6 +17,9 @@ from simulation import simulators
 
 
 def main():
+    available_codes = stocks.get_availables()
+    available_codes = [code for code in available_codes if mas.get_calculator(code).is_straight()]
+
     market_open_time = datetime.time(hour=9, minute=0, second=0)
     logging.info('APP STARTED')
     logging.info(f'장시작 확인 및 대기 - 장시작: {market_open_time}')
@@ -27,7 +32,7 @@ def main():
         time.sleep(1)
 
     logging.info('LET START SIMULATIONS')
-    simulators.Simulator_2().start()
+    simulators.Simulator_2(available_codes).start()
     # simulators.Simulator_3().start()
     # simulators.Simulator_1().start()
 

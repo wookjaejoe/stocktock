@@ -7,7 +7,7 @@ from creon import stocks
 from utils import calc
 
 
-wallet = simulators.Simulator_2().wallet
+wallet = simulators.Simulator_2([]).wallet
 
 @dataclass(init=False)
 class HoldingStockEvaluation:

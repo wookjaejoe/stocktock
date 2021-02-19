@@ -13,8 +13,6 @@ from utils import calc
 from utils.slack import WarrenSession, Message
 
 # 취급 코드들
-available_codes = stocks.get_availables()
-available_codes = [code for code in available_codes if mas.get_calculator(code).is_straight()]
 
 
 @dataclass
@@ -90,8 +88,9 @@ class Record:
 
 
 class Simulator(abc.ABC):
-    def __init__(self, name):
+    def __init__(self, name, codes):
         self.name = name
+        self.codes = codes
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
         self.warren_session: Optional[WarrenSession] = None
@@ -200,8 +199,8 @@ class Simulator_1(Simulator):
     3번
     """
 
-    def __init__(self):
-        super().__init__('[3]골든_데드_크로스')
+    def __init__(self, codes):
+        super().__init__('[3]골든_데드_크로스', codes)
 
     def on_event(self, event: events.Event):
         logging.debug(f'{event.code} {event.category}')
@@ -210,7 +209,7 @@ class Simulator_1(Simulator):
         if event.category in [44, 45]:
             return
 
-        if event.code not in available_codes:
+        if event.code not in self.codes:
             return
 
         detail = list(stocks.get_details([event.code]))[0]
@@ -235,11 +234,11 @@ class Simulator_2(Simulator):
     2번
     """
 
-    def __init__(self):
-        super().__init__('[2]5일선_상향돌파')
+    def __init__(self, codes):
+        super().__init__('[2]5일선_상향돌파', codes)
 
     def run(self):
-        details = stocks.get_details(available_codes)
+        details = stocks.get_details(self.codes)
         # 모든 취급 종목에 대해...
         for detail in details:
             try:
@@ -266,12 +265,12 @@ class Simulator_3(Simulator):
     1번
     """
 
-    def __init__(self):
-        super().__init__('[1]MA60_120_하방터치')
+    def __init__(self, codes):
+        super().__init__('[1]MA60_120_하방터치', codes)
 
     def run(self):
         # 취급 종목의 상세정보 구한다
-        details = stocks.get_details(available_codes)
+        details = stocks.get_details(self.codes)
         for detail in details:
             try:
                 # 본 종목의 60/120MA를 구한다
