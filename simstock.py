@@ -266,4 +266,4 @@ def main(codes: List[str]):
 
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
-    main([code for code in available_codes if available_codes.index(code) % 5 == 0][:200])
+    main(available_codes)
