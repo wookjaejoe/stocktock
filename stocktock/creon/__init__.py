@@ -1,20 +1,42 @@
 import ctypes
+import json
 import os
 import time
+from dataclasses import dataclass
+from pathlib import Path
 
+import jsons
+from bson import json_util
 from pywinauto import application
 
 from . import com
 
-CREON_PATH = 'C:\CREON\STARTER\coStarter.exe'
-CREON_ID = 'WJJO'
-PWD = 'dnrwo1!'
-PWD_CERT = 'Whdnrwo1!!'
+CONFIG_PATH = os.path.join(Path.home(), '.creon.config')
+
+
+@dataclass
+class Configuration:
+    exe_path: str
+    id: str
+    pw: str
+    cert_pw: str
+
+    def save(self):
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(jsons.dump(self, default=json_util.default), f, indent=2)
+
+    @classmethod
+    def load(cls):
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return jsons.loads(f.read(), Configuration)
+
+
+config = Configuration.load()
 
 
 def start_client():
     app = application.Application()
-    app.start(f'{CREON_PATH} /prj:cp /id:{CREON_ID} /pwd:{PWD} /pwdcert:{PWD_CERT} /autostart')
+    app.start(f'{config.exe_path} /prj:cp /id:{config.id} /pwd:{config.pw} /pwdcert:{config.cert_pw} /autostart')
 
 
 def kill_client():
