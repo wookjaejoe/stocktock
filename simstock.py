@@ -15,8 +15,6 @@ from creon import charts, stocks
 logger = logging.getLogger()
 
 available_codes = stocks.get_availables()
-available_codes = [code for code in available_codes if stocks.get_capital_type(code) == 3]
-
 details: Dict[str, stocks.StockDetail2] = {detail.code: detail for detail in stocks.get_details(available_codes)}
 
 
@@ -136,7 +134,7 @@ class BreakAbove5MaEventPublisher:
 
         self.daily_candles: Dict[date, charts.ChartData] = {candle.datetime.date(): candle
                                                             for candle in self.daily_candles}
-        self.last_candle: charts.ChartData = None
+        self.last_candle: Optional[charts.ChartData] = None
 
     def ma(self, dt: date, length: int):
         closes = [candle.close for candle in self.daily_candles.values()
@@ -234,20 +232,21 @@ class BreakAbove5MaEventPublisher:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
 
 
-def main():
+def main(codes: List[str]):
+    codes = codes[:100]
     start_time = time.time()
 
     count = 0
-    for code in available_codes:
+    for code in codes:
         count += 1
         logger.info(
-            f'[{count}/{len(available_codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
+            f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 
         ep = None
         try:
             ep = BreakAbove5MaEventPublisher(code,
-                                             begin=date(year=2020, month=8, day=1),
-                                             end=date(year=2021, month=2, day=14))
+                                             begin=date(year=2020, month=10, day=1),
+                                             end=date(year=2021, month=12, day=31))
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))
@@ -259,4 +258,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    available_codes.sort(key=lambda code: details.get(code).capitalization())
+    # 2000억 이하
+    main([code for code in available_codes if details.get(code).capitalization() < 2000_0000_0000])
+    # 시총 중간
+    mid = int(len(available_codes) / 2)
+    main([code for code in available_codes][mid - 80:mid + 80])
+    # 시총 상위
+    main([code for code in available_codes][-100:])

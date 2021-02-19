@@ -8,6 +8,7 @@ from pathlib import Path
 import jsons
 from bson import json_util
 from pywinauto import application
+import logging
 
 from . import com
 
@@ -27,6 +28,10 @@ class Configuration:
 
     @classmethod
     def load(cls):
+        if not os.path.isfile(CONFIG_PATH):
+            logging.warning(f'{CONFIG_PATH} not exists.')
+            return
+
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             return jsons.loads(f.read(), Configuration)
 
