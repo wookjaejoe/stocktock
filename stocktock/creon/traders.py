@@ -69,61 +69,69 @@ class VirtualOrder:
         self.total_price = self.order_price * self.order_count
 
 
-@limit_safe(req_type=ReqType.TRADE)
-def _order(order_type: OrderType, code: str, price: int, count: int):
-    acc = td_util.AccountNumber[0]  # 계좌번호
-    accFlag = td_util.GoodsList(acc, 1)  # 주식상품 구분
-    objStockOrder = win32com.client.Dispatch("CpTrade.CpTd0311")
-    objStockOrder.SetInputValue(0, order_type.value)  # 1: 매도, 2: 매수
-    objStockOrder.SetInputValue(1, acc)  # 계좌번호
-    objStockOrder.SetInputValue(2, accFlag[0])  # 상품구분 - 주식 상품 중 첫번째
-    objStockOrder.SetInputValue(3, code)  # 종목코드
-    objStockOrder.SetInputValue(4, count)  # 매수수량
-    objStockOrder.SetInputValue(5, price)  # 주문단가 - 필요한 가격으로 변경 필요
-    objStockOrder.SetInputValue(7, "0")  # 주문 조건 구분 코드, 0: 기본 1: IOC 2:FOK
-    objStockOrder.SetInputValue(8, "01")  # 주문호가 구분코드 - 01: 보통
-    ret = objStockOrder.BlockRequest()
+class OrderManager:
 
-    # 만약 4를 리턴받은 경우는 15초동안 호출 제한을 초과한 경우로 잠시 후 다시 요청이 필요 합니다.
-    # assert ret == 0, f'주문 요청 오류({ret})'  # 0: 정상,  그 외 오류, 4: 주문요청제한 개수 초과
-    if ret == 4:
-        time.sleep(20)
-        _order(order_type, code, price, count)
+    @limit_safe(req_type=ReqType.TRADE)
+    def order(self, order_type: OrderType, code: str, price: int, count: int):
+        logging.info(f'Trying to order {code} - {price} * {count}')
+        acc = td_util.AccountNumber[0]  # 계좌번호
+        acc_flag = td_util.GoodsList(acc, 1)  # 주식상품 구분
+        td_311 = win32com.client.Dispatch("CpTrade.CpTd0311")
+        td_311.SetInputValue(0, order_type.value)  # 1: 매도, 2: 매수
+        td_311.SetInputValue(1, acc)  # 계좌번호
+        td_311.SetInputValue(2, acc_flag[0])  # 상품구분 - 주식 상품 중 첫번째
+        td_311.SetInputValue(3, code)  # 종목코드
+        td_311.SetInputValue(4, count)  # 매수수량
+        td_311.SetInputValue(5, price)  # 주문단가 - 필요한 가격으로 변경 필요
+        td_311.SetInputValue(7, "0")  # 주문 조건 구분 코드, 0: 기본 1: IOC 2:FOK
+        td_311.SetInputValue(8, "01")  # 주문호가 구분코드 - 01: 보통
+        ret = td_311.BlockRequest()
 
-    rqStatus = objStockOrder.GetDibStatus()
-    errMsg = objStockOrder.GetDibMsg1()
-    if rqStatus == 0:
-        logging.info(f'ORDER COMPLETE - {order_type.value}, {code}, {price}, {count}')
-    else:
-        ### todo: 미체결 방어
-        logging.error(f'주문 실패({rqStatus}) - {errMsg}')
+        # 만약 4를 리턴받은 경우는 15초동안 호출 제한을 초과한 경우로 잠시 후 다시 요청이 필요 합니다.
+        # assert ret == 0, f'주문 요청 오류({ret})'  # 0: 정상,  그 외 오류, 4: 주문요청제한 개수 초과
+        req_status = td_311.GetDibStatus()
+        err_msg = td_311.GetDibMsg1()
+        if req_status == 0:
+            order_detail = {
+                '주문종목코드': td_311.GetHeaderValue(0),
+                '계좌번호': td_311.GetHeaderValue(1),
+                '상품관리구분코드': td_311.GetHeaderValue(2),
+                '종목코드': td_311.GetHeaderValue(3),
+                '주문수량': td_311.GetHeaderValue(4),
+                '주문단가': td_311.GetHeaderValue(5),
+                '주문번호': td_311.GetHeaderValue(8),
+                '계좌명': td_311.GetHeaderValue(9),
+                '종목명': td_311.GetHeaderValue(10),
+                '주문조건구분코드': td_311.GetHeaderValue(12),
+            }
 
+            str_order_detail = ', '.join([f'{key}: {value}' for key, value in order_detail.items()])
+            logging.info(f'ORDER COMPLETE: {str_order_detail}')
+            order_num = order_detail.get('주문번호')
+            self.review(order_num)
+            return order_num
+        else:
+            logging.error(f'ORDER FAILURE({req_status}) - {err_msg}')
 
-def _buy(code: str, count: int):
-    price = stocks.get_detail(code).offer
-    _order(order_type=OrderType.BUY,
-           code=code,
-           price=price,
-           count=count)
-    return price
+            if ret == 4:
+                time.sleep(20)
 
+            logging.info(f'Retrying to order...')
+            self.order(order_type, code, price, count)
 
-def _sell(code: str, count: int):
-    price = stocks.get_detail(code).bid
-    _order(order_type=OrderType.SELL,
-           code=code,
-           price=price,
-           count=count)
-    return price
+    def review(self, order_num: int):
+        # todo: 1분뒤
+        # todo: 미체결 확인
+        pass
 
 
 # 예약 주문 내역 조회 및 미체결 리스트 구하기
 def order_list():
     acc = td_util.AccountNumber[0]  # 계좌번호
-    accFlag = td_util.GoodsList(acc, 1)  # 주식상품 구분
+    acc_flag = td_util.GoodsList(acc, 1)  # 주식상품 구분
     td_9065 = win32com.client.Dispatch("CpTrade.CpTd9065")
     td_9065.SetInputValue(0, acc)
-    td_9065.SetInputValue(1, accFlag[0])
+    td_9065.SetInputValue(1, acc_flag[0])
     td_9065.SetInputValue(2, 20)
 
     while True:  # 연속 조회로 전체 예약 주문 가져온다.
@@ -153,27 +161,11 @@ def order_list():
             break
 
 
-class Trader:
+def buy(code, price, count):
+    order_manager = OrderManager()
+    order_manager.order(order_type=OrderType.BUY, code=code, price=price, count=count)
 
-    def __init__(self):
-        self.queue: List[Order] = []
-        threading.Thread(target=self.start_consume, daemon=True).start()
 
-    def request_order(self, order: Order):
-        self.queue.append(order)
-
-    def start_consume(self):
-        while True:
-            if self.queue:
-                order = self.queue.pop()
-                try:
-                    if order.order_type == OrderType.BUY:
-                        price = _buy(order.code, order.count)
-                    elif order.order_type == OrderType.SELL:
-                        price = _sell(order.code, order.count)
-                    else:
-                        return
-                except BaseException as e:
-                    logging.warning(e)
-            else:
-                time.sleep(1)
+def sell(code, price, count):
+    order_manager = OrderManager()
+    order_manager.order(order_type=OrderType.SELL, code=code, price=price, count=count)
