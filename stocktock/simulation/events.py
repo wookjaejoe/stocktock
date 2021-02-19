@@ -32,7 +32,7 @@ class PastMinuteCandleProvdider(EventPublisher):
         begin = self.begin
 
         while not self.stopped:
-            end = begin + timedelta(days=7)
+            end = begin + timedelta(days=10)
             if end > self.end:
                 end = self.end
                 self.stopped = True
