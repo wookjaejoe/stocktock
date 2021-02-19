@@ -107,44 +107,15 @@ def get_all(market_type: MarketType) -> List[Stock]:
 
 ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 
-_availables = None
 
-
-def get_availables(capit_min: int = 0, capit_max: int = 0) -> List[str]:
-    """
-    임시 코드 - 시가 총액 2000억 ~ 10000억
-    """
-    global _availables
-    if _availables:
-        return _availables
-
+def get_availables() -> List[str]:
     # 찌꺼기 필터링
     logging.info('Filtering trashes...')
-    available_codes = [stock.code for stock in ALL_STOCKS if
-                       get_status(stock.code) == 0 and
-                       get_supervision(stock.code) == 0 and
-                       get_control_kind(stock.code) == 0 and
-                       get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST]
-
-    # 디테일 생성
-    logging.info(f'Make details for {len(available_codes)} stocks...')
-    details: Dict[str, StockDetail2] = {
-        detail.code: detail
-        for detail in get_details(available_codes)
-    }
-
-    # 시가 총액 기반 필터링
-    logging.info('Filtering with capitalizations...')
-    if capit_min:
-        details = {code: detail for code, detail in details.items() if
-                   capit_min < detail.capitalization()}
-    if capit_max:
-        details = {code: detail for code, detail in details.items() if
-                   detail.capitalization() < capit_max}
-
-    _availables = list(details.keys())
-    logging.info(f'Finished filtering - final availables: {len(_availables)}')
-    return _availables
+    return [stock.code for stock in ALL_STOCKS if
+            get_status(stock.code) == 0 and
+            get_supervision(stock.code) == 0 and
+            get_control_kind(stock.code) == 0 and
+            get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST]
 
 
 def get_name(code: str):
