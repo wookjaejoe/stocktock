@@ -53,8 +53,8 @@ class Wallet:
             dt,  # 주문시각
             'BUY',  # 구분
             code,  # 종목코드
-            details.get(code).capitalization(),
             stocks.get_name(code),  # 종목명
+            details.get(code).capitalization(),
             price,  # 주문가
             count,  # 주문수량
             total,  # 주문총액
@@ -84,7 +84,7 @@ class Wallet:
             'SELL',  # 구분
             code,  # 종목코드
             stocks.get_name(code),  # 종목명
-            details.get(code).capitalization(),  #
+            details.get(code).capitalization(),  # 시총
             sell_price,  # 주문가
             sell_count,  # 주문수량
             sell_price * sell_count,  # 주문총액
@@ -105,7 +105,7 @@ class NotEnoughChartException(BaseException):
         return f'Not enough chart for {self.name}({self.code})'
 
 
-class BreakAbove5MaEventPublisher:
+class Simulator:
 
     def __init__(self, code: str, begin: date, end: date):
         self.wallet = Wallet()
@@ -157,6 +157,15 @@ class BreakAbove5MaEventPublisher:
         self.on_finished()
 
     def on_finished(self):
+        pass
+
+    def on_candle(self, candle: charts.ChartData):
+        pass
+
+
+class BreakAbove5MaEventSimulator(Simulator):
+
+    def on_finished(self):
         if self.last_candle and self.wallet.has(self.code):
             self.wallet.sell(dt=self.last_candle.datetime,
                              code=self.last_candle.code,
@@ -196,32 +205,17 @@ class BreakAbove5MaEventPublisher:
             earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
 
             # 손절 체크
-            if earnings_rate < -4:
+            if earnings_rate < -5:
                 # 손절라인
                 sell_amount = 1
             # 익절 체크
-            elif earnings_rate > 5:
-                if holding.max_price * 0.97 > cur_price:
-                    # max * 0.97 > 현재가: 모두 매도
-                    sell_amount = 1
-                elif earnings_rate > 15:
-                    # 익절라인
-                    sell_amount = 1
-                elif not holding.is_10_beneath and earnings_rate > 10:
-                    # 익절라인 12%: 2/3 매도
-                    sell_amount = 1 / 2
-                    holding.is_10_beneath = True
-                elif not holding.is_5_beneath:
-                    # 익절라인 5%: 1/3 매도
-                    sell_amount = 1 / 3
-                    holding.is_5_beneath = True
-                else:
-                    sell_amount = 0
-            elif holding.is_5_beneath:
-                # 5% 작은데, 5% 찍은적이 있다? 그럼 다 팔아
+            elif earnings_rate > 7:
                 sell_amount = 1
             else:
                 sell_amount = 0
+
+            if cur_price < ma_5:
+                sell_amount = 1
 
             if sell_amount:
                 self.wallet.sell(candle.datetime,
@@ -240,6 +234,10 @@ class BreakAbove5MaEventPublisher:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
 
 
+class GoldenDeadCrossSimulator(Simulator):
+    pass
+
+
 def main(codes: List[str]):
     start_time = time.time()
 
@@ -249,11 +247,14 @@ def main(codes: List[str]):
         logger.info(
             f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 
+        begin = date(year=2019, month=1, day=23)
+        end = date(year=2019, month=5, day=10)
+        logger.info(f'{begin} ~ {end}')
         ep = None
         try:
-            ep = BreakAbove5MaEventPublisher(code,
-                                             begin=date(year=2020, month=8, day=1),
-                                             end=date(year=2020, month=10, day=30))
+            ep = BreakAbove5MaEventSimulator(code,
+                                             begin=begin,
+                                             end=end)
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))
@@ -266,4 +267,7 @@ def main(codes: List[str]):
 
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
+    available_codes = [code for code in available_codes if
+                       2000_0000_0000 < details.get(code).capitalization() < 5_0000_0000_0000 if
+                       available_codes.index(code) % 3 == 0]
     main(available_codes)
