@@ -143,6 +143,9 @@ class Simulator:
     def ma_5(self, dt: date):
         return self.ma(dt, 5)
 
+    def ma_10(self, dt: date):
+        return self.ma(dt, 10)
+
     def ma_20(self, dt: date):
         return self.ma(dt, 20)
 
@@ -235,7 +238,76 @@ class BreakAbove5MaEventSimulator(Simulator):
 
 
 class GoldenDeadCrossSimulator(Simulator):
-    pass
+
+    def on_finished(self):
+        if self.last_candle and self.wallet.has(self.code):
+            self.wallet.sell(dt=self.last_candle.datetime,
+                             code=self.last_candle.code,
+                             sell_price=self.last_candle.close,
+                             sell_amount=1)
+
+        detail = details.get(self.code)
+
+        if self.wallet.earnings:
+            final_msg_items = [
+                '###',
+                self.code,
+                detail.name,
+                detail.capitalization(),
+                self.wallet.earnings
+            ]
+
+            logger.critical(', '.join([str(item) for item in final_msg_items]))
+
+    def on_candle(self, candle: charts.ChartData):
+        self.last_candle = candle
+        ma_5_cur = self.ma_5(candle.datetime.date())
+        ma_5_yst = self.ma_5(candle.datetime.date() - timedelta(days=1))
+        ma_10_cur = self.ma_10(candle.datetime.date())
+        ma_10_yst = self.ma_10(candle.datetime.date() - timedelta(days=1))
+        ma_20_yst = self.ma_20(candle.datetime.date() - timedelta(days=1))
+        ma_60_yst = self.ma_60(candle.datetime.date() - timedelta(days=1))
+        ma_120_yst = self.ma_120(candle.datetime.date() - timedelta(days=1))
+
+        cur_price = candle.close
+        daily_candle = self.daily_candles.get(candle.datetime.date())
+
+        if self.wallet.has(code=self.code):  # 보유 종목에 대한 매도 판단
+            holding = self.wallet.get(self.code)
+
+            # max 갱신
+            holding.max_price = max(holding.max_price, cur_price)
+
+            # 수익율 계산
+            earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
+
+            # 손절 체크
+            if earnings_rate < -5:
+                # 손절라인
+                sell_amount = 1
+            # 익절 체크
+            elif earnings_rate > 12:
+                sell_amount = 1
+            else:
+                sell_amount = 0
+
+            if ma_5_yst > ma_10_yst > ma_5_cur:
+                sell_amount = 1
+
+            if sell_amount:
+                self.wallet.sell(candle.datetime,
+                                 self.code,
+                                 sell_price=cur_price,
+                                 sell_amount=sell_amount)
+
+            # TODO: 넣을지 말지 확인
+            # candle_time = candle.datetime.time()
+            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
+            #     # 장종료전에 마감해보자
+            #     self.wallet.sell(candle.datetime, self.code, cur_price)
+        else:  # 미보유 종목에 대한 매수 판단
+            if ma_120_yst < ma_60_yst < ma_20_yst and ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
+                self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
 
 
 def main(codes: List[str]):
@@ -252,7 +324,7 @@ def main(codes: List[str]):
         logger.info(f'{begin} ~ {end}')
         ep = None
         try:
-            ep = BreakAbove5MaEventSimulator(code,
+            ep = GoldenDeadCrossSimulator(code,
                                              begin=begin,
                                              end=end)
             ep.start()
@@ -268,6 +340,6 @@ def main(codes: List[str]):
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
     available_codes = [code for code in available_codes if
-                       2000_0000_0000 < details.get(code).capitalization() < 5_0000_0000_0000 if
-                       available_codes.index(code) % 3 == 0]
+                       2000_0000_0000 < details.get(code).capitalization() if
+                       available_codes.index(code)]
     main(available_codes)

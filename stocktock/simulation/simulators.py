@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import *
 
-from creon import events, stocks, mas
+from creon import stocks, mas
 from utils import calc
 from utils.slack import WarrenSession, Message
 
@@ -94,6 +94,8 @@ class Simulator(abc.ABC):
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
         self.warren_session: Optional[WarrenSession] = None
+        self.bend_line = 7
+        self.stop_line = -5
 
     @abc.abstractmethod
     def run(self):
@@ -110,14 +112,14 @@ class Simulator(abc.ABC):
                 except:
                     self.logger.error('An error occured while running the simulation.', exc_info=sys.exc_info())
 
-                time.sleep(5)
+                time.sleep(7)
 
                 try:
                     self.check_stop_line()
                 except:
                     self.logger.error('An error occured while checking stop line.', exc_info=sys.exc_info())
 
-                time.sleep(5)
+                time.sleep(7)
 
         threading.Thread(target=work).start()
 
@@ -136,15 +138,15 @@ class Simulator(abc.ABC):
 
             cur_price = detail.price
             earnings_rate = calc.earnings_ratio(holding.price, cur_price)
-            if earnings_rate < -5:
+            if earnings_rate < self.stop_line:
                 # 손절
                 self.try_sell(code=holding.code,
-                              what=f'손절 -5%',
+                              what=f'손절 {self.stop_line}%',
                               order_price=detail.price)
-            elif earnings_rate > 7:
+            elif earnings_rate > self.bend_line:
                 # 익절
                 self.try_sell(code=holding.code,
-                              what=f'익절 7%',
+                              what=f'익절 {self.bend_line}%',
                               order_price=detail.price)
 
     def try_buy(self, code: str, what: str, order_price: int = None):
@@ -194,41 +196,6 @@ class Simulator(abc.ABC):
         ).summit(logger=self.logger, warren_session=self.warren_session)
 
 
-class Simulator_1(Simulator):
-    """
-    3번
-    """
-
-    def __init__(self, codes):
-        super().__init__('[3]골든_데드_크로스', codes)
-
-    def on_event(self, event: events.Event):
-        logging.debug(f'{event.code} {event.category}')
-
-        # 골든/데드 크로스 아닌 이벤트는 무시
-        if event.category in [44, 45]:
-            return
-
-        if event.code not in self.codes:
-            return
-
-        detail = list(stocks.get_details([event.code]))[0]
-
-        if event.category == 45:
-            # 골든크로스 & 어제_20MA < 현재_20MA < 현재가
-            self.try_buy(code=event.code, what='[3-45]골든크로스', order_price=detail.price)
-        elif event.category == 44:
-            self.try_sell(code=event.code, what='[3-46]데드크로스', order_price=detail.price)
-
-    def run(self):
-        events.subscribe(self.on_event)
-        events.start()
-
-    def start(self):
-        threading.Thread(target=self.check_stop_line).start()
-        self.run()
-
-
 class Simulator_2(Simulator):
     """
     2번
@@ -253,6 +220,41 @@ class Simulator_2(Simulator):
                         what='[2]5일선_상향돌파',
                         order_price=detail.price
                     )
+            except:
+                logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
+
+
+class Simulator_1(Simulator):
+    """
+    2번
+    """
+
+    def __init__(self, codes):
+        super().__init__('골든데드크로스', codes)
+        self.bend_line = 12
+        self.stop_line = -5
+
+    def run(self):
+        for detail in stocks.get_details([holding.code for holding in self.wallet.holdings]):
+            ma_calc = mas.get_calculator(detail.code)
+            ma_5_cur = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
+            ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
+            ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
+            if ma_5_yst > ma_10_yst > ma_5_cur:
+                self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
+
+        # 모든 취급 종목에 대해...
+        for detail in stocks.get_details(self.codes):
+            try:
+                # 전일 기준 5MA, 20MA 구한다
+                ma_calc = mas.get_calculator(detail.code)
+                ma_5_cur = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
+                ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
+                ma_10_cur = ma_calc.get(mas.MA.MA_10, cur_price=detail.price)
+                ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
+
+                if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
+                    self.try_buy(code=detail.code, what='골든크로스', order_price=detail.price)
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 

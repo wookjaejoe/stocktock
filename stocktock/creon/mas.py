@@ -9,6 +9,7 @@ from datetime import date, timedelta
 
 class MA(Enum):
     MA_5 = 5
+    MA_10 = 10
     MA_20 = 20
     MA_60 = 60
     MA_120 = 120

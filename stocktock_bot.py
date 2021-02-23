@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import time
+from typing import *
 
 from creon import stocks, mas
 
@@ -19,6 +20,10 @@ from simulation import simulators
 def main():
     available_codes = stocks.get_availables()
     available_codes = [code for code in available_codes if mas.get_calculator(code).is_straight()]
+    details: Dict[str, stocks.StockDetail2] = {detail.code: detail for detail in stocks.get_details(available_codes)}
+    available_codes = [code for code in available_codes if
+                       2000_0000_0000 < details.get(code).capitalization() if
+                       available_codes.index(code)]
 
     market_open_time = datetime.time(hour=9, minute=0, second=0)
     logging.info('APP STARTED')
@@ -33,7 +38,7 @@ def main():
 
     logging.info('LET START SIMULATIONS')
     simulators.Simulator_2(available_codes).start()
-    # simulators.Simulator_3().start()
+    simulators.Simulator_1(available_codes).start()
     # simulators.Simulator_1().start()
 
     while True:
