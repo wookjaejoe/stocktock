@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import *
 
-from creon import stocks, mas
+from creon import stocks, mas, traders
 from utils import calc
 from utils.slack import WarrenSession, Message
 
@@ -169,6 +169,7 @@ class Simulator(abc.ABC):
             order_count=order_count,
             total=order_total
         ).summit(logger=self.logger, warren_session=self.warren_session)
+        traders.buy(code=code, price=order_price, count=order_count)
 
     def try_sell(self, code: str, what: str, order_price: int = None):
         if not self.wallet.has(code):
@@ -194,6 +195,7 @@ class Simulator(abc.ABC):
             earning_price=order_total - holding_total,
             earning_rate=calc.earnings_ratio(holding.price, order_price)
         ).summit(logger=self.logger, warren_session=self.warren_session)
+        traders.sell(code=code, price=order_price, count=holding.count)
 
 
 class Simulator_2(Simulator):
