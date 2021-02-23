@@ -5,14 +5,14 @@ import sys
 import time
 from typing import *
 
+from utils import log
+
+log.init(logging.DEBUG)
+
 from creon import stocks, mas
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(basedir, 'stocktock'))
-
-from utils import log
-
-log.init(logging.DEBUG)
 
 from simulation import simulators
 
