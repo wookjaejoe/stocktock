@@ -37,9 +37,7 @@ def main():
         time.sleep(1)
 
     logging.info('LET START SIMULATIONS')
-    simulators.Simulator_2(available_codes).start()
     simulators.Simulator_1(available_codes).start()
-    # simulators.Simulator_1().start()
 
     while True:
         time.sleep(1)
