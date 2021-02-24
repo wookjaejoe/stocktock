@@ -111,13 +111,14 @@ class OrderManager:
             self.review(order_num)
             return order_num
         else:
-            logging.error(f'ORDER FAILURE({req_status}) - {err_msg}')
-
-            if ret == 4:
-                time.sleep(20)
-
-            logging.info(f'Retrying to order...')
-            self.order(order_type, code, price, count)
+            pass # todo
+            # logging.error(f'ORDER FAILURE({req_status}) - {err_msg}')
+            #
+            # if ret == 4:
+            #     time.sleep(20)
+            #
+            # logging.info(f'Retrying to order...')
+            # self.order(order_type, code, price, count)
 
     def review(self, order_num: int):
         # todo: 1분뒤

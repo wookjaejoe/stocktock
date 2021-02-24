@@ -16,7 +16,10 @@ class MA(Enum):
 
 
 def avg(values: List[int]) -> float:
-    return sum(values) / len(values)
+    if values:
+        return sum(values) / len(values)
+    else:
+        return 0
 
 
 class MaCalculator:
@@ -42,12 +45,8 @@ class MaCalculator:
         Ex) 오늘 ma 조회 get(ma, cur_price)
         Ex) 어제 ma 조회 get(ma, pos=-1)
         """
-        if pos:
-            return avg([cd.close for cd in self.chart[-ma_type.value + pos: pos]])
-        else:
-            assert cur_price, 'Incorrect code: cur_price is not presented.'
-            # 최근 n-1개 데이터 및 현재가의 평균
-            return avg([cd.close for cd in self.chart[-ma_type.value:]] + [cur_price])
+        closes = [cd.close for cd in self.chart] + [cur_price]
+        return avg(closes[-ma_type.value + pos: pos])
 
     def is_straight(self):
         ma_20 = self.get(ma_type=MA.MA_20, pos=-1)

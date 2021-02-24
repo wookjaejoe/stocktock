@@ -131,29 +131,19 @@ class Simulator:
                                                             for candle in self.daily_candles}
         self.last_candle: Optional[charts.ChartData] = None
 
-    def ma(self, dt: date, length: int):
-        closes = [candle.close for candle in self.daily_candles.values()
-                  if candle.datetime.date() <= dt][-length:]
+    def ma(self, dt: date, length: int, cur_price: int = 0, pos: int = 0):
+        values = [candle.close for candle in self.daily_candles.values()
+                  if candle.datetime.date() <= dt] + [cur_price]
 
-        if length > len(closes):
+        if pos:
+            values = values[-length + pos: pos]
+        else:
+            values = values[-length:]
+
+        if length > len(values):
             raise NotEnoughChartException(self.code, stocks.get_name(self.code))
 
-        return sum(closes) / length
-
-    def ma_5(self, dt: date):
-        return self.ma(dt, 5)
-
-    def ma_10(self, dt: date):
-        return self.ma(dt, 10)
-
-    def ma_20(self, dt: date):
-        return self.ma(dt, 20)
-
-    def ma_60(self, dt: date):
-        return self.ma(dt, 60)
-
-    def ma_120(self, dt: date):
-        return self.ma(dt, 120)
+        return sum(values) / length
 
     def start(self):
         self.candle_provider.start()
@@ -261,16 +251,14 @@ class GoldenDeadCrossSimulator(Simulator):
 
     def on_candle(self, candle: charts.ChartData):
         self.last_candle = candle
-        ma_5_cur = self.ma_5(candle.datetime.date())
-        ma_5_yst = self.ma_5(candle.datetime.date() - timedelta(days=1))
-        ma_10_cur = self.ma_10(candle.datetime.date())
-        ma_10_yst = self.ma_10(candle.datetime.date() - timedelta(days=1))
-        ma_20_yst = self.ma_20(candle.datetime.date() - timedelta(days=1))
-        ma_60_yst = self.ma_60(candle.datetime.date() - timedelta(days=1))
-        ma_120_yst = self.ma_120(candle.datetime.date() - timedelta(days=1))
-
         cur_price = candle.close
-        daily_candle = self.daily_candles.get(candle.datetime.date())
+        ma_5_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=5)
+        ma_5_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=5)
+        ma_10_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=10)
+        ma_10_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=10)
+        ma_20_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=20)
+        ma_60_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=60)
+        ma_120_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=120)
 
         if self.wallet.has(code=self.code):  # 보유 종목에 대한 매도 판단
             holding = self.wallet.get(self.code)
@@ -325,8 +313,8 @@ def main(codes: List[str]):
         ep = None
         try:
             ep = GoldenDeadCrossSimulator(code,
-                                             begin=begin,
-                                             end=end)
+                                          begin=begin,
+                                          end=end)
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))

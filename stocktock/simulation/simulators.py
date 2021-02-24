@@ -243,7 +243,9 @@ class Simulator_1(Simulator):
             ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
             ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
             if ma_5_yst > ma_10_yst > ma_5_cur:
-                self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
+                if self.wallet.has(detail.code):
+                    self.logger.info(f'{detail.code} {detail.name} - {ma_5_yst} > {ma_10_yst} > {ma_5_cur}')
+                    self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
 
         # 모든 취급 종목에 대해...
         for detail in stocks.get_details(self.codes):
@@ -256,7 +258,9 @@ class Simulator_1(Simulator):
                 ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
 
                 if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
-                    self.try_buy(code=detail.code, what='골든크로스', order_price=detail.price)
+                    if not self.wallet.has(detail.code):
+                        self.logger.info(f'{detail.code} {detail.name} - {ma_5_yst} < {ma_10_yst} < {ma_5_cur} < {ma_10_cur * 1.03}')
+                        self.try_buy(code=detail.code, what='골든크로스', order_price=detail.price)
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
