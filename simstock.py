@@ -133,7 +133,7 @@ class Simulator:
 
     def ma(self, dt: date, length: int, cur_price: int = 0, pos: int = 0):
         values = [candle.close for candle in self.daily_candles.values()
-                  if candle.datetime.date() <= dt] + [cur_price]
+                  if candle.datetime.date() < dt] + [cur_price]
 
         if pos:
             values = values[-length + pos: pos]
