@@ -1,10 +1,10 @@
 import logging
+from datetime import date, timedelta
 from enum import Enum
 from typing import *
 
 from creon import charts
 from database import dailycharts
-from datetime import date, timedelta
 
 
 class MA(Enum):
@@ -16,10 +16,7 @@ class MA(Enum):
 
 
 def avg(values: List[int]) -> float:
-    if values:
-        return sum(values) / len(values)
-    else:
-        return 0
+    return sum(values) / len(values)
 
 
 class MaCalculator:
@@ -46,13 +43,20 @@ class MaCalculator:
         Ex) 어제 ma 조회 get(ma, pos=-1)
         """
         closes = [cd.close for cd in self.chart] + [cur_price]
-        return avg(closes[-ma_type.value + pos: pos])
+        if pos:
+            return avg(closes[-ma_type.value + pos: pos])
+        else:
+            return avg(closes[-ma_type.value:])
 
     def is_straight(self):
-        ma_20 = self.get(ma_type=MA.MA_20, pos=-1)
-        ma_60 = self.get(ma_type=MA.MA_60, pos=-1)
-        ma_120 = self.get(ma_type=MA.MA_120, pos=-1)
-        return ma_20 > ma_60 > ma_120
+        try:
+            ma_20 = self.get(ma_type=MA.MA_20, pos=-1)
+            ma_60 = self.get(ma_type=MA.MA_60, pos=-1)
+            ma_120 = self.get(ma_type=MA.MA_120, pos=-1)
+            return ma_20 > ma_60 > ma_120
+        except:
+            logging.warning(f'Failed to check {self.code} is straight')
+            return False
 
 
 _calc_pool: Dict[str, MaCalculator] = {}
@@ -64,7 +68,12 @@ def init_pool():
         if chart_data.code not in _calc_pool:
             _calc_pool.update({chart_data.code: MaCalculator(chart_data.code, [])})
 
-        _calc_pool.get(chart_data.code).chart.append(chart_data)
+        if chart_data.datetime.date() != date.today():
+            _calc_pool.get(chart_data.code).chart.append(chart_data)
+
+    for code, calc in _calc_pool.items():
+        if len(calc.chart) < 100:
+            logging.warning(f'Not enought chart data for {code}')
 
     yesterday = date.today() - timedelta(days=1)
     if max([cd.datetime for cd in list(_calc_pool.values())[0].chart]).date() != yesterday:

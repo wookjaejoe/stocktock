@@ -226,6 +226,13 @@ class Simulator_2(Simulator):
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
 
+def dict_to_msg(d: dict):
+    msg = '```'
+    msg += '\n'.join([f'{k}: {v}' for k, v in d.items()])
+    msg += '```'
+    return Message(msg)
+
+
 class Simulator_1(Simulator):
     """
     2번
@@ -244,7 +251,15 @@ class Simulator_1(Simulator):
             ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
             if ma_5_yst > ma_10_yst > ma_5_cur:
                 if self.wallet.has(detail.code):
-                    self.logger.info(f'{detail.code} {detail.name} - {ma_5_yst} > {ma_10_yst} > {ma_5_cur}')
+                    ma_dict = {
+                        'code    ': detail.code,
+                        'name    ': detail.name,
+                        'yst  5ma': ma_5_yst,
+                        'yst 10ma': ma_10_yst,
+                        'cur  5ma': ma_5_cur,
+                    }
+
+                    self.warren_session.send(dict_to_msg(ma_dict))
                     self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
 
         # 모든 취급 종목에 대해...
@@ -259,6 +274,16 @@ class Simulator_1(Simulator):
 
                 if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
                     if not self.wallet.has(detail.code):
+                        ma_dict = {
+                            'code    ': detail.code,
+                            'name    ': detail.name,
+                            'yst  5ma': ma_5_yst,
+                            'yst 10ma': ma_10_yst,
+                            'cur  5ma': ma_5_cur,
+                            'cur 10ma': ma_10_cur
+                        }
+
+                        self.warren_session.send(dict_to_msg(ma_dict))
                         self.logger.info(f'{detail.code} {detail.name} - {ma_5_yst} < {ma_10_yst} < {ma_5_cur} < {ma_10_cur * 1.03}')
                         self.try_buy(code=detail.code, what='골든크로스', order_price=detail.price)
             except:

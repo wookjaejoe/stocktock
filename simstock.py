@@ -270,11 +270,11 @@ class GoldenDeadCrossSimulator(Simulator):
             earnings_rate = calc.earnings_ratio(self.wallet.get(self.code).price, cur_price)
 
             # 손절 체크
-            if earnings_rate < -5:
+            if earnings_rate < -10:
                 # 손절라인
                 sell_amount = 1
             # 익절 체크
-            elif earnings_rate > 12:
+            elif earnings_rate > 16:
                 sell_amount = 1
             else:
                 sell_amount = 0
@@ -307,8 +307,8 @@ def main(codes: List[str]):
         logger.info(
             f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 
-        begin = date(year=2019, month=1, day=23)
-        end = date(year=2019, month=5, day=10)
+        begin = date.today() - timedelta(days=100)
+        end = date.today()
         logger.info(f'{begin} ~ {end}')
         ep = None
         try:

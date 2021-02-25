@@ -91,7 +91,7 @@ class WarrenSession(Warren):
         sup = super(WarrenSession, self)
         while True:
             while self.queue:
-                sup.send(self.queue.pop(), self.ts)
+                sup.send(self.queue.pop(0), self.ts)
 
             time.sleep(1)
 
