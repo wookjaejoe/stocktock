@@ -288,11 +288,6 @@ class GoldenDeadCrossSimulator(Simulator):
                                  sell_price=cur_price,
                                  sell_amount=sell_amount)
 
-            # TODO: 넣을지 말지 확인
-            # candle_time = candle.datetime.time()
-            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
-            #     # 장종료전에 마감해보자
-            #     self.wallet.sell(candle.datetime, self.code, cur_price)
         else:  # 미보유 종목에 대한 매수 판단
             if ma_120_yst < ma_60_yst < ma_20_yst and ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
@@ -327,7 +322,4 @@ def main(codes: List[str]):
 
 if __name__ == '__main__':
     available_codes.sort(key=lambda code: details.get(code).capitalization())
-    available_codes = [code for code in available_codes if
-                       2000_0000_0000 < details.get(code).capitalization() if
-                       available_codes.index(code)]
     main(available_codes)
