@@ -110,7 +110,7 @@ class Simulator:
     def __init__(self, code: str, begin: date, end: date):
         self.wallet = Wallet()
         self.code = code
-        self.candle_provider = simulation.events.PastMinuteCandleProvdider(code, begin, end)
+        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end)
         self.candle_provider.subscribers.append(self.on_candle)
         self.daily_candles: List[charts.ChartData] = charts.request_by_term(
             code=code,
@@ -180,10 +180,10 @@ class BreakAbove5MaEventSimulator(Simulator):
 
     def on_candle(self, candle: charts.ChartData):
         self.last_candle = candle
-        ma_5 = self.ma_5(candle.datetime.date() - timedelta(days=1))
-        ma_20 = self.ma_20(candle.datetime.date() - timedelta(days=1))
-        ma_60 = self.ma_60(candle.datetime.date() - timedelta(days=1))
-        ma_120 = self.ma_120(candle.datetime.date() - timedelta(days=1))
+        ma_5_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=5)
+        ma_20_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=20)
+        ma_60_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=60)
+        ma_120_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=120)
 
         cur_price = candle.close
         daily_candle = self.daily_candles.get(candle.datetime.date())
@@ -252,6 +252,7 @@ class GoldenDeadCrossSimulator(Simulator):
     def on_candle(self, candle: charts.ChartData):
         self.last_candle = candle
         cur_price = candle.close
+
         ma_5_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=5)
         ma_5_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=5)
         ma_10_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=10)
