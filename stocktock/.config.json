@@ -1,8 +1,15 @@
 {
-  "database_scheme": "postgresql://",
-  "database_host": "15.165.62.190",
-  "_database_host": "127.0.0.1",
-  "database_port": "5432",
-  "database_pw": "hermes",
-  "database_user": "hermes"
+  "database": {
+    "scheme": "postgresql://",
+    "host": "15.165.62.190",
+    "port": "5432",
+    "pw": "hermes",
+    "user": "hermes"
+  },
+  "creon": {
+    "cert_pw": "",
+    "exe": "C:\\CREON\\STARTER\\coStarter.exe",
+    "id": "",
+    "pw": ""
+  }
 }

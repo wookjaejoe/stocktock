@@ -10,12 +10,26 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), '.config.json')
 
 
 @dataclass
+class CreonConfig:
+    exe: str
+    id: str
+    pw: str
+    cert_pw: str
+
+
+@dataclass
+class DatabaseConfig:
+    scheme: str
+    user: str
+    pw: str
+    host: str
+    port: str
+
+
+@dataclass
 class Configuration:
-    database_scheme: str
-    database_user: str
-    database_pw: str
-    database_host: str
-    database_port: str
+    creon: CreonConfig
+    database: DatabaseConfig
 
     def save(self):
         with open(CONFIG_PATH, 'w', encoding='utf-8') as f:

@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from config import config
 
 engine = sqlalchemy.create_engine(
-    f'{config.database_scheme}{config.database_user}:{config.database_pw}@{config.database_host}:{config.database_port}/hermes',
+    f'{config.database.scheme}{config.database.user}:{config.database.pw}@{config.database.host}:{config.database.port}/hermes',
     client_encoding='utf-8')
 conn = engine.connect()
 Session = sessionmaker(bind=engine)
