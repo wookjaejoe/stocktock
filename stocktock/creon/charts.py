@@ -26,6 +26,7 @@ class ChartData:
     vol: int
 
 
+# noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
     chart = stockchart()
@@ -71,6 +72,7 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
     return items
 
 
+# noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData]:
     chart = stockchart()

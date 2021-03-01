@@ -108,6 +108,12 @@ def get_all(market_type: MarketType) -> List[Stock]:
 ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
 
 
+def find(code: str) -> Optional[Stock]:
+    for stock in ALL_STOCKS:
+        if code in stock.code:
+            return stock
+
+
 def get_availables() -> List[str]:
     # 찌꺼기 필터링
     logging.info('Filtering trashes...')

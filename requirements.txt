@@ -15,3 +15,5 @@ retry
 jsons
 pykrx
 finance-datareader
+psycopg2
+sqlalchemy
