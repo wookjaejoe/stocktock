@@ -30,7 +30,7 @@ def get_day_candles(code: str, begin: date, end: date) -> List[Candle]:
                 close=candle.close,
                 low=candle.low,
                 high=candle.high
-            ).insert(commit=True)
+            ).insert(do_commit=True)
 
     return candles
 
