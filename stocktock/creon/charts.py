@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta, date
 
+from model import Candle
 from .com import *
+from .stocks import find
 
 KST = timezone(timedelta(hours=9))
 
@@ -14,21 +15,10 @@ class ChartType(Enum):
     TICK = ord('T')
 
 
-@dataclass
-class ChartData:
-    code: str
-    chart_type: ChartType
-    datetime: datetime
-    open: int
-    high: int
-    low: int
-    close: int
-    vol: int
-
-
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
+    code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드
     chart.SetInputValue(1, ord('1'))  # 개수로 받기
@@ -55,10 +45,10 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
         except:
             _time = datetime.strptime('0000', '%H%M').time()
 
-        data = ChartData(
+        data = Candle(
             code=code,
-            chart_type=chart_type,
-            datetime=datetime.combine(date=_date, time=_time).astimezone(KST),
+            date=_date,
+            time=_time,
             open=_open,
             high=high,
             low=low,
@@ -68,13 +58,14 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
 
         items.append(data)
 
-    items.sort(key=lambda chart_data: chart_data.datetime)
+    items.sort(key=lambda candle: datetime.combine(candle.date, candle.time))
     return items
 
 
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
-def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData]:
+def request(code: str, chart_type: ChartType, count: int = -1) -> List[Candle]:
+    code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드
     chart.SetInputValue(1, ord('2'))  # 개수로 받기
@@ -104,10 +95,10 @@ def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData
         except:
             _time = datetime.strptime('0000', '%H%M').time()
 
-        data = ChartData(
+        data = Candle(
             code=code,
-            chart_type=chart_type,
-            datetime=datetime.combine(date=_date, time=_time).astimezone(KST),
+            date=_date,
+            time=_time,
             open=_open,
             high=high,
             low=low,
@@ -117,5 +108,5 @@ def request(code: str, chart_type: ChartType, count: int = -1) -> List[ChartData
 
         items.append(data)
 
-    items.sort(key=lambda chart_data: chart_data.datetime)
+    items.sort(key=lambda candle: datetime.combine(candle.date, candle.time))
     return items

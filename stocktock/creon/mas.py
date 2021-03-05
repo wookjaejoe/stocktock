@@ -63,7 +63,6 @@ _calc_pool: Dict[str, MaCalculator] = {}
 
 
 def init_pool():
-    logging.info('Loading chart data from...')
     for chart_data in dailycharts.load_cache():
         if chart_data.code not in _calc_pool:
             _calc_pool.update({chart_data.code: MaCalculator(chart_data.code, [])})

@@ -110,7 +110,7 @@ class Simulator:
     def __init__(self, code: str, begin: date, end: date):
         self.wallet = Wallet()
         self.code = code
-        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end)
+        self.candle_provider = simulation.events.PastMinuteCandleProvdider(code, begin, end)
         self.candle_provider.subscribers.append(self.on_candle)
         self.daily_candles: List[charts.ChartData] = charts.request_by_term(
             code=code,
@@ -207,9 +207,6 @@ class BreakAbove5MaEventSimulator(Simulator):
             else:
                 sell_amount = 0
 
-            if cur_price < ma_5:
-                sell_amount = 1
-
             if sell_amount:
                 self.wallet.sell(candle.datetime,
                                  self.code,
@@ -223,7 +220,7 @@ class BreakAbove5MaEventSimulator(Simulator):
             #     self.wallet.sell(candle.datetime, self.code, cur_price)
         else:  # 미보유 종목에 대한 매수 판단
             # 정배열 판단 & daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02
-            if ma_120 < ma_60 < ma_20 < daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02:
+            if ma_120_yst < ma_60_yst < ma_20_yst < daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.02:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
 
 
@@ -252,7 +249,6 @@ class GoldenDeadCrossSimulator(Simulator):
     def on_candle(self, candle: charts.ChartData):
         self.last_candle = candle
         cur_price = candle.close
-
         ma_5_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=5)
         ma_5_yst = self.ma(dt=candle.datetime.date(), pos=-1, length=5)
         ma_10_cur = self.ma(dt=candle.datetime.date(), cur_price=cur_price, length=10)
@@ -289,6 +285,11 @@ class GoldenDeadCrossSimulator(Simulator):
                                  sell_price=cur_price,
                                  sell_amount=sell_amount)
 
+            # TODO: 넣을지 말지 확인
+            # candle_time = candle.datetime.time()
+            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
+            #     # 장종료전에 마감해보자
+            #     self.wallet.sell(candle.datetime, self.code, cur_price)
         else:  # 미보유 종목에 대한 매수 판단
             if ma_120_yst < ma_60_yst < ma_20_yst and ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
                 self.wallet.buy(candle.datetime, code=self.code, price=cur_price, count=int(BUY_LIMIT / cur_price))
@@ -303,14 +304,14 @@ def main(codes: List[str]):
         logger.info(
             f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 
-        begin = date.today() - timedelta(days=100)
-        end = date.today()
+        begin = date(2020, 8, 1)
+        end = date(2020, 10, 31)
         logger.info(f'{begin} ~ {end}')
         ep = None
         try:
-            ep = GoldenDeadCrossSimulator(code,
-                                          begin=begin,
-                                          end=end)
+            ep = BreakAbove5MaEventSimulator(code,
+                                             begin=begin,
+                                             end=end)
             ep.start()
         except NotEnoughChartException as e:
             logger.warning(str(e))

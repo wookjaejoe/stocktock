@@ -1,7 +1,7 @@
 {
   "database": {
     "scheme": "postgresql://",
-    "host": "15.165.62.190",
+    "host": "220.85.170.154",
     "port": "5432",
     "pw": "hermes",
     "user": "hermes"

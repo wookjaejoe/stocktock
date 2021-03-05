@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import *
 
 import sqlalchemy
@@ -19,6 +19,10 @@ session = Session()
 Base = declarative_base()
 
 
+def commit():
+    session.commit()
+
+
 class Query:
     @classmethod
     def query(cls) -> sqlalchemy.orm.Query:
@@ -30,6 +34,19 @@ class Query:
             cls.query().filter_by(**kwargs).exists()
         ).scalar()
 
+    def update(self, **kwargs):
+        changed = False
+        for k, v in kwargs.items():
+            if self.__getattribute__(k) != v:
+                self.__setattr__(k, v)
+                changed = True
+
+        if changed:
+            commit()
+
+    def insert(self, do_commit: bool = True):
+        session.add(self)
+
 
 class Stock(Base, Query):
     __tablename__ = 'stocks'
@@ -40,12 +57,6 @@ class Stock(Base, Query):
 
     def __str__(self):
         return f'[{self.id}]{self.code}:{self.name}'
-
-    def insert(self, commit: bool):
-        if not self.exists(code=self.code):  # if not exists
-            session.add(self)
-            if commit:
-                session.commit()
 
     @classmethod
     def find_by_code(cls, code: str) -> Optional[Stock]:
@@ -69,11 +80,6 @@ class Candle(Query):
     def __str__(self):
         return f'[{self.id}]{self.stock_id}:{self.close}'
 
-    def insert(self, commit: bool):
-        session.add(self)
-        if commit:
-            session.commit()
-
     @classmethod
     def insert_many(cls, candles: List[Candle]):
         session.add_all(candles)
@@ -87,6 +93,9 @@ class DayCandle(Candle, Base):
 class MinuteCandle(Candle, Base):
     __tablename__ = 'minute_charts'
 
+    def insert(self, do_commit: bool = False):
+        raise Exception(f'Do not call {self.__class__.__name__}:{self.insert.__name__}')
+
 
 def normalize(code: str):
     return code[-6:]
@@ -94,46 +103,3 @@ def normalize(code: str):
 
 def print_log(msg: str):
     print(f'[{datetime.now()}] ' + msg)
-
-
-def update_day_charts(begin: date, end: date):
-    from creon import charts, stocks
-
-    def convert(_stock_id, source: charts.ChartData) -> DayCandle:
-        # noinspection PyTypeChecker
-        return DayCandle(
-            stock_id=_stock_id,
-            date=source.datetime.date(),
-            time=None,
-            open=source.open,
-            close=source.close,
-            low=source.low,
-            high=source.high
-        )
-
-    all_stocks = Stock.query().all()
-
-    for stock in all_stocks:
-        chart = charts.request_by_term(
-            code=stocks.find(stock.code).code,
-            chart_type=charts.ChartType.DAY,
-            begin=begin,
-            end=end,
-        )
-
-        print_log(f'[{all_stocks.index(stock) + 1}/{len(all_stocks)}] ...')
-        stock_id = Stock.find_by_code(normalize(stock.code)).id
-
-        # DayCandle.insert_many([convert(stock_id, candle) for candle in chart])
-        session.bulk_save_objects([convert(stock_id, candle) for candle in chart])
-        session.commit()
-
-
-def main():
-    # noinspection PyUnresolvedReferences
-    session.execute(MinuteCandle.__table__.delete())
-    session.commit()
-
-
-if __name__ == '__main__':
-    main()
