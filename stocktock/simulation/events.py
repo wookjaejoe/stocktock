@@ -38,7 +38,7 @@ class MinuteCandleProvdider(EventPublisher):
                 end = self.end
                 self.stopped = True
 
-            chart = charts.request_by_term(code=self.code, chart_type=charts.ChartType.MINUTES, begin=begin, end=end)
+            chart = charts.request_by_term(code=self.code, chart_type=charts.ChartType.MINUTE, begin=begin, end=end)
             for candle in chart:
                 if candle.date > self.end:
                     break

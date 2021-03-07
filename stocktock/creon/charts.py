@@ -11,13 +11,21 @@ class ChartType(Enum):
     DAY = ord('D')
     WEEK = ord('W')
     MONTH = ord('M')
-    MINUTES = ord('m')
+    MINUTE = ord('m')
     TICK = ord('T')
+
+    @classmethod
+    def create_by_name(cls, name):
+        for chart_type in ChartType:
+            if chart_type.name == name:
+                return chart_type
 
 
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
+
+
     code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드

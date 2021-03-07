@@ -121,7 +121,8 @@ def get_availables() -> List[str]:
             get_status(stock.code) == 0 and
             get_supervision(stock.code) == 0 and
             get_control_kind(stock.code) == 0 and
-            get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST]
+            get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST and
+            '스팩' not in stock.name]
 
 
 def get_name(code: str):

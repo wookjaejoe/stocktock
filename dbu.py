@@ -49,7 +49,7 @@ def update_minute_candles(stock: db.Stock):
         # 2주치 분봉 캔들 조회
         chart = creon_charts.request_by_term(
             code=stock.code,
-            chart_type=creon_charts.ChartType.MINUTES,
+            chart_type=creon_charts.ChartType.MINUTE,
             begin=cur_date,
             end=cur_date + timedelta(days=14)
         )

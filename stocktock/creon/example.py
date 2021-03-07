@@ -74,7 +74,7 @@ def main():
     for code in all_codes:
         chart = charts.request_by_term(
             code=code,
-            chart_type=charts.ChartType.MINUTES,
+            chart_type=charts.ChartType.MINUTE,
             begin=date.today() - timedelta(days=1),
             end=date.today()
         )
