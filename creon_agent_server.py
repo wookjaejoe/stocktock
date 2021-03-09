@@ -18,6 +18,8 @@ from datetime import timedelta
 
 from creon import stocks
 from creon import charts
+from creon.exceptions import CreonError
+from creon.connection import connector as creon_connector
 
 # set protocol HTTP/1.1
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
@@ -30,6 +32,9 @@ class HttpError(IOError):
         self.url = request.url
         self.status_code = status_code
         self.msg = msg
+
+    def __str__(self):
+        return self.msg
 
 
 class BadRequestError(HttpError):
@@ -52,21 +57,26 @@ def append_common_headers(response):
     return response
 
 
+@app.errorhandler(HttpError)
+def handle_http_erorr(e: HttpError):
+    return str(e), e.status_code
+
+
+@app.errorhandler(CreonError)
+def handle_creon_error(e: CreonError):
+    creon_connector.connect()
+    return str(e), 500
+
+
 @app.errorhandler(Exception)
 def handle_exception(e: Exception):
     logging.error(str(e), exc_info=e)
     return str(e), 500
 
 
-@app.errorhandler(HttpError)
-def handle_exception(e: HttpError):
-    return e.msg, e.status_code
-
-
 def asjson(value):
     return jsons.dumps(value,
-                       encoding='utf-8',
-                       jdkwargs={'indent': 2})
+                       jdkwargs={'indent': 2, 'ensure_ascii': False})
 
 
 @app.route('/')

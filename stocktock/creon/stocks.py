@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from retry import retry
+from .exceptions import CreonRequestError
 
 from .com import *
 
@@ -146,22 +147,25 @@ def is_kos(code):
     return False
 
 
-@retry(tries=3, delay=5)
+@retry(tries=3, delay=1)
 @limit_safe(ReqType.NON_TRADE)
 def get_detail(code: str) -> StockDetail:
     _stockmst = stockmst()
 
     # 현재가 객체 구하기
     _stockmst.SetInputValue(0, code)
-    _stockmst.BlockRequest()
-    req_status = _stockmst.GetDibStatus()
-    req_msg = _stockmst.GetDibMsg1()
-    assert req_status == 0, f'Request Failure: ({req_status}) {req_msg}'
 
     try:
-        exFlag = ExpectedFlag(_stockmst.GetHeaderValue(58))
+        _stockmst.BlockRequest()
+    except Exception as e:
+        raise CreonRequestError(str(e))
+
+    CreonRequestError.check(_stockmst)
+
+    try:
+        ex_flag = ExpectedFlag(_stockmst.GetHeaderValue(58))
     except:
-        exFlag = None
+        ex_flag = None
 
     # todo: 헤더 훨씬 많음
     # http://cybosplus.github.io/cpdib_rtf_1_/stockmst.htm
@@ -181,7 +185,7 @@ def get_detail(code: str) -> StockDetail:
         vol_value=_stockmst.GetHeaderValue(19),  # 거래대금
 
         # 예상 체결관련 정보
-        exFlag=exFlag,  # 예상체결가 구분 플래그
+        exFlag=ex_flag,  # 예상체결가 구분 플래그
         exPrice=_stockmst.GetHeaderValue(55),  # 예상체결가
         exDiff=_stockmst.GetHeaderValue(56),  # 예상체결가 전일대비
         exVol=_stockmst.GetHeaderValue(57),  # 예상체결수량
@@ -264,7 +268,14 @@ def get_details(stock_codes: List[str]):
     def request(codes: List[str]):
         _stockmst2 = stockmst2()
         _stockmst2.SetInputValue(0, ','.join(codes))
-        _stockmst2.BlockRequest()
+
+        try:
+            _stockmst2.BlockRequest()
+        except Exception as e:
+            raise CreonRequestError(str(e))
+
+        CreonRequestError.check(_stockmst2)
+
         count = _stockmst2.GetHeaderValue(0)
         result = []
         for i in range(count):

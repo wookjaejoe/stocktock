@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta, date
 from model import Candle
 from .com import *
 from .stocks import find
+from .exceptions import CreonRequestError
 
 KST = timezone(timedelta(hours=9))
 
@@ -24,8 +25,6 @@ class ChartType(Enum):
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
-
-
     code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드
@@ -35,8 +34,14 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
     chart.SetInputValue(5, [0, 1, 2, 3, 4, 5, 8])
     chart.SetInputValue(6, chart_type.value)  # '차트 주기 - 분/틱
     chart.SetInputValue(9, ord('1'))  # 수정주가 사용
-    chart.BlockRequest()
-    assert chart.GetDibStatus() == 0, chart.GetDibMsg1()
+
+    try:
+        chart.BlockRequest()
+    except Exception as e:
+        raise CreonRequestError(str(e))
+
+    CreonRequestError.check(chart)
+
     count = chart.GetHeaderValue(3)
     items = []
     for i in range(count):
@@ -83,9 +88,14 @@ def request(code: str, chart_type: ChartType, count: int = -1) -> List[Candle]:
     chart.SetInputValue(6, chart_type.value)  # '차트 주기 - 분/틱
     chart.SetInputValue(7, 1)  # 분틱차트 주기
     chart.SetInputValue(9, ord('1'))  # 수정주가 사용
-    chart.BlockRequest()
 
-    assert chart.GetDibStatus() == 0, chart.GetDibMsg1()
+    try:
+        chart.BlockRequest()
+    except Exception as e:
+        raise CreonRequestError(str(e))
+
+    CreonRequestError.check(chart)
+
     count = chart.GetHeaderValue(3)
     items = []
     for i in range(count):
