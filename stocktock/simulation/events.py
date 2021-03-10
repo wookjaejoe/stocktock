@@ -22,10 +22,11 @@ class EventPublisher(abc.ABC):
 
 class MinuteCandleProvdider(EventPublisher):
 
-    def __init__(self, code: str, begin: date, end: date):
+    def __init__(self, code: str, begin: date, end: date, period=1):
         self.code = code
         self.begin = begin
         self.end = end
+        self.period = period
         self.subscribers: List[Callable[[Candle], None]] = []
         self.stopped = False
 
@@ -33,12 +34,17 @@ class MinuteCandleProvdider(EventPublisher):
         begin = self.begin
 
         while not self.stopped:
-            end = begin + timedelta(days=10)
+            end = begin + timedelta(days=10 * self.period)
             if end > self.end:
                 end = self.end
                 self.stopped = True
 
-            chart = charts.request_by_term(code=self.code, chart_type=charts.ChartType.MINUTE, begin=begin, end=end)
+            chart = charts.request_by_term(
+                code=self.code,
+                chart_type=charts.ChartType.MINUTE,
+                begin=begin,
+                end=end,
+                period=self.period)
             for candle in chart:
                 if candle.date > self.end:
                     break

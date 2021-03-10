@@ -1,9 +1,13 @@
 import logging
 import math
+import os
+import sys
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from typing import *
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'stocktock'))
 
 from model import Candle
 from utils import calc, log
@@ -128,7 +132,7 @@ class Simulator:
         self.wallet = Wallet()
         self.code = code
         self.result = SimulationResult()
-        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end)
+        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end, period=5)
         self.candle_provider.subscribers.append(self.on_candle)
         self.candle_provider.subscribers.append(lambda candle: self.result.candles.append(candle))
         self.daily_candles: List[Candle] = charts.request_by_term(
@@ -333,20 +337,25 @@ class Term:
 
 
 def main(codes: List[str]):
+    with open('logs/stocktock-20210308.log', encoding='utf-8') as f:
+        lines = [line for line in f.readlines() if '###' in line or '[' in line]
+        executed = ''.join(lines)
+
     start_time = time.time()
 
+    # 1.9 ~ 2.1 // 3.12 ~ 6.14
     terms = [
-        Term(date(2019, 1, 15), date(2019, 2, 28)),
-        Term(date(2019, 4, 9), date(2019, 4, 23)),
-        Term(date(2019, 6, 10), date(2019, 7, 3)),
-        Term(date(2019, 9, 4), date(2019, 10, 4)),
-        Term(date(2019, 10, 24), date(2019, 11, 20)),
-        Term(date(2019, 12, 7), date(2019, 12, 31)),
+        Term(date(2018, 1, 9), date(2018, 1, 18)),
+        Term(date(2018, 3, 12), date(2018, 6, 14)),
     ]
 
     count = 0
     for code in codes:
         count += 1
+
+        # if code in executed or stocks.get_name(code) in executed:
+        #     continue
+
         logger.info(
             f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
 

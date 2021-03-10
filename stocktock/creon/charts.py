@@ -24,7 +24,7 @@ class ChartType(Enum):
 
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
-def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
+def request_by_term(code: str, chart_type: ChartType, begin: date, end: date, period=1):
     code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드
@@ -33,6 +33,7 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date):
     chart.SetInputValue(3, int(begin.strftime('%Y%m%d')))  # 요청 종료일
     chart.SetInputValue(5, [0, 1, 2, 3, 4, 5, 8])
     chart.SetInputValue(6, chart_type.value)  # '차트 주기 - 분/틱
+    chart.SetInputValue(7, period)  # '차트 주기 - 분/틱
     chart.SetInputValue(9, ord('1'))  # 수정주가 사용
 
     try:
