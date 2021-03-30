@@ -11,7 +11,7 @@ def keep_connection():
         try:
             connector.connect()
             connector.wait_connection()
-            time.sleep(5)
+            time.sleep(120)
         except Exception as e:
             logging.error('Failed to keep connection with CreonPlus.', exc_info=e)
 

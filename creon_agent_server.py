@@ -106,7 +106,7 @@ def get_charts():
     # todo: 이거 어노테이션으로 파라미터 처리할 수 있겠다.
     check_required('code', 'chart_type', 'begin', 'end')
 
-    # 코드
+    # 종목 코드
     code = request.args.get('code')
 
     # 봉 타입

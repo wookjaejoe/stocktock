@@ -16,6 +16,7 @@ from . import com
 CONFIG_PATH = os.path.join(Path.home(), '.creon.config')
 
 assert ctypes.windll.shell32.IsUserAnAdmin(), 'Not administrator'
+assert application  # Keep importing pywinauto
 
 
 @dataclass
@@ -48,8 +49,9 @@ class CreonConnector:
 
     @classmethod
     def _start_client(cls):
-        app = application.Application()
-        app.start(f'{config.exe_path} /prj:cp /id:{config.id} /pwd:{config.pw} /pwdcert:{config.cert_pw} /autostart')
+        # app = application.Application()
+        os.system(f'{config.exe_path} /prj:cp /id:{config.id} /pwd:{config.pw} /pwdcert:{config.cert_pw} /autostart')
+        # app.start(f'{config.exe_path} /prj:cp /id:{config.id} /pwd:{config.pw} /pwdcert:{config.cert_pw} /autostart')
 
     @classmethod
     def _kill_client(cls):
@@ -83,6 +85,7 @@ class CreonConnector:
                 logging.info('Starting CreonPlus...')
                 cls._start_client()
                 cls.wait_connection()
+                logging.info('CreonPlus Started Successfully')
             finally:
                 cls.reconnecting = False
 
