@@ -115,15 +115,27 @@ def find(code: str) -> Optional[Stock]:
             return stock
 
 
-def get_availables() -> List[str]:
-    # 찌꺼기 필터링
-    logging.info('Filtering trashes...')
-    return [stock.code for stock in ALL_STOCKS if
-            get_status(stock.code) == 0 and
-            get_supervision(stock.code) == 0 and
-            get_control_kind(stock.code) == 0 and
-            get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST and
-            '스팩' not in stock.name]
+available_codes = None
+
+
+def get_availables(init=False) -> List[str]:
+    global available_codes
+
+    if init:
+        available_codes = None
+
+    if available_codes:
+        return available_codes
+
+    logging.info('Filtering codes...')
+    available_codes = [stock.code for stock in ALL_STOCKS if
+                       get_status(stock.code) == 0 and
+                       get_supervision(stock.code) == 0 and
+                       get_control_kind(stock.code) == 0 and
+                       get_stock_section_kind(stock.code) == SectionKind.CPC_KSE_SECTION_KIND_ST and
+                       '스팩' not in stock.name]
+
+    return available_codes
 
 
 def get_name(code: str):

@@ -20,6 +20,8 @@ from creon import stocks
 from creon import charts
 from creon.exceptions import CreonError
 from creon.connection import connector as creon_connector
+from datetime import date
+from dataclasses import dataclass
 
 # set protocol HTTP/1.1
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
@@ -130,6 +132,31 @@ def get_charts():
                                          begin=begin,
                                          end=end))
 
+
+@dataclass
+class PostSimulationsBody:
+    code: str
+    begin: date
+    end: date
+    earning_line: int
+    stop_line: int
+    strategy: str
+
+
+@app.route('/simulations', methods=['POST'])
+def post_simulations():
+    body: PostSimulationsBody = jsons.loads(request.data.decode('utf-8'), PostSimulationsBody)
+    simulator = BreakAbove5MaEventSimulator(
+        code=body.code,
+        begin=body.begin,
+        end=body.end,
+        earning_line=body.earning_line,
+        stop_line=body.stop_line
+    )
+    return asjson(simulator.start())
+
+
+from simstock import BreakAbove5MaEventSimulator
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0',
