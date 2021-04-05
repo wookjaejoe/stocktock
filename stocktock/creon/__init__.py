@@ -16,4 +16,4 @@ def keep_connection():
             logging.error('Failed to keep connection with CreonPlus.', exc_info=e)
 
 
-Thread(target=keep_connection).start()
+# Thread(target=keep_connection).start()

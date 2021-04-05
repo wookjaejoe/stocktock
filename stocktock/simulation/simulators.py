@@ -112,14 +112,14 @@ class Simulator(abc.ABC):
                 except:
                     self.logger.error('An error occured while running the simulation.', exc_info=sys.exc_info())
 
-                time.sleep(7)
+                time.sleep(5)
 
                 try:
                     self.check_stop_line()
                 except:
                     self.logger.error('An error occured while checking stop line.', exc_info=sys.exc_info())
 
-                time.sleep(7)
+                time.sleep(5)
 
         threading.Thread(target=work).start()
 
@@ -204,7 +204,7 @@ class Simulator_2(Simulator):
     """
 
     def __init__(self, codes):
-        super().__init__('[2]5일선_상향돌파', codes)
+        super().__init__('5MA_상향돌파', codes)
 
     def run(self):
         details = stocks.get_details(self.codes)
@@ -213,13 +213,14 @@ class Simulator_2(Simulator):
             try:
                 # 전일 기준 5MA, 20MA 구한다
                 ma_calc = mas.get_calculator(detail.code)
-                ma_5 = ma_calc.get(mas.MA.MA_5, pos=-1)
-                ma_20 = ma_calc.get(mas.MA.MA_20, pos=-1)
+                ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
+                ma_20_yst = ma_calc.get(mas.MA.MA_20, pos=-1)
+                ma_60_yst = ma_calc.get(mas.MA.MA_60, pos=-1)
 
-                if ma_20 < detail.open < ma_5 <= detail.price < ma_5 * 1.02:
+                if ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.price < ma_5_yst * 1.025:
                     self.try_buy(
                         code=detail.code,
-                        what='[2]5일선_상향돌파',
+                        what='5MA 상향돌파',
                         order_price=detail.price
                     )
             except:
@@ -249,6 +250,8 @@ class Simulator_1(Simulator):
             ma_5_cur = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
             ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
             ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
+
+            # 데드크로스이면, 판다
             if ma_5_yst > ma_10_yst > ma_5_cur:
                 if self.wallet.has(detail.code):
                     ma_dict = {
@@ -272,6 +275,7 @@ class Simulator_1(Simulator):
                 ma_10_cur = ma_calc.get(mas.MA.MA_10, cur_price=detail.price)
                 ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
 
+                # 골든크로스이면, 산다
                 if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
                     if not self.wallet.has(detail.code):
                         ma_dict = {
@@ -289,41 +293,3 @@ class Simulator_1(Simulator):
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
 
-
-####
-# DEPRECATED !!!
-####
-class Simulator_3(Simulator):
-    """
-    1번
-    """
-
-    def __init__(self, codes):
-        super().__init__('[1]MA60_120_하방터치', codes)
-
-    def run(self):
-        # 취급 종목의 상세정보 구한다
-        details = stocks.get_details(self.codes)
-        for detail in details:
-            try:
-                # 본 종목의 60/120MA를 구한다
-                ma_calc = mas.get_calculator(detail.code)
-                ma_60 = ma_calc.get(mas.MA.MA_60, cur_price=-1)
-                ma_120 = ma_calc.get(mas.MA.MA_120, cur_price=-1)
-
-                if ma_60 <= detail.price <= ma_60 * 1.02:
-                    self.try_buy(
-                        code=detail.code,
-                        what='[1]60MA_하방터치',
-                        order_price=detail.price
-                    )
-                elif ma_120 <= detail.price <= ma_120 * 1.02:
-                    self.try_buy(
-                        code=detail.code,
-                        what='[1]120MA_하방터치',
-                        order_price=detail.price
-                    )
-            except:
-                logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
-
-        time.sleep(10)

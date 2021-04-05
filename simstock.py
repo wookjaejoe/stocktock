@@ -132,7 +132,7 @@ class Simulator:
         self.wallet = Wallet()
         self.code = code
         self.result = SimulationResult()
-        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end, period=5)
+        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end)
         self.candle_provider.subscribers.append(self.on_candle)
         self.candle_provider.subscribers.append(lambda candle: self.result.candles.append(candle))
         self.daily_candles: List[Candle] = charts.request_by_term(
@@ -233,7 +233,7 @@ class BreakAbove5MaEventSimulator(Simulator):
                 # 손절라인
                 sell_amount = 1
             # 익절 체크
-            elif earnings_rate > 7:
+            elif earnings_rate > 10:
                 sell_amount = 1
             else:
                 sell_amount = 0
@@ -244,15 +244,9 @@ class BreakAbove5MaEventSimulator(Simulator):
                                  sell_price=cur_price,
                                  sell_amount=sell_amount)
                 self._sell(datetime.combine(candle.date, candle.time))
-
-            # TODO: 넣을지 말지 확인
-            # candle_time = candle.datetime.time()
-            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
-            #     # 장종료전에 마감해보자
-            #     self.wallet.sell(candle.datetime, self.code, cur_price)
         else:  # 미보유 종목에 대한 매수 판단
-            # 정배열 판단 & daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02
-            if ma_120_yst < ma_60_yst < ma_20_yst < daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.02:
+            # 120MA < 60MA < 5MA < 20MA and 5MA 상향돌파
+            if ma_120_yst < ma_60_yst < ma_5_yst < ma_20_yst and daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.025:
                 self.wallet.buy(datetime.combine(candle.date, candle.time), code=self.code, price=cur_price,
                                 count=int(BUY_LIMIT / cur_price))
                 self._buy(datetime.combine(candle.date, candle.time))
@@ -337,24 +331,30 @@ class Term:
 
 
 def main(codes: List[str]):
-    with open('logs/stocktock-20210308.log', encoding='utf-8') as f:
-        lines = [line for line in f.readlines() if '###' in line or '[' in line]
-        executed = ''.join(lines)
+    # with open('logs/stocktock-20210308.log', encoding='utf-8') as f:
+    #     lines = [line for line in f.readlines() if '###' in line or '[' in line]
+    #     executed = ''.join(lines)
 
     start_time = time.time()
 
-    # 1.9 ~ 2.1 // 3.12 ~ 6.14
+    # 2019-01-15 ~ 2019-02-28
+    # 2019-04-09 ~ 2019-04-23
+    # 2019-06-10 ~ 2019-07-03
+    # 2019-09-04 ~ 2019-10-04
+    # 2019-10-24 ~ 2019-11-20
+    # 2019-12-07 ~ 2019-12-31
     terms = [
-        Term(date(2018, 1, 9), date(2018, 1, 18)),
-        Term(date(2018, 3, 12), date(2018, 6, 14)),
+        Term(date(2019, 1, 15), date(2019, 2, 28)),
+        Term(date(2019, 4, 9), date(2019, 4, 23)),
+        Term(date(2019, 6, 10), date(2019, 7, 3)),
+        Term(date(2019, 9, 4), date(2019, 10, 4)),
+        Term(date(2019, 10, 24), date(2019, 11, 20)),
+        Term(date(2019, 12, 7), date(2019, 12, 31)),
     ]
 
     count = 0
     for code in codes:
         count += 1
-
-        # if code in executed or stocks.get_name(code) in executed:
-        #     continue
 
         logger.info(
             f'[{count}/{len(codes)}] {stocks.get_name(code)} - 시총: {details.get(code).capitalization()}')
