@@ -94,7 +94,7 @@ class Simulator(abc.ABC):
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
         self.warren_session: Optional[WarrenSession] = None
-        self.bend_line = 7
+        self.bend_line = 10
         self.stop_line = -5
 
     @abc.abstractmethod
@@ -136,18 +136,26 @@ class Simulator(abc.ABC):
                 logging.warning('The detail is null: ' + holding.code)
                 continue
 
+            if not detail.price:
+                logging.warning('The price is 0: ' + holding.code)
+                continue
+
             cur_price = detail.price
             earnings_rate = calc.earnings_ratio(holding.price, cur_price)
-            if earnings_rate < self.stop_line:
-                # 손절
-                self.try_sell(code=holding.code,
-                              what=f'손절 {self.stop_line}%',
-                              order_price=detail.price)
-            elif earnings_rate > self.bend_line:
-                # 익절
-                self.try_sell(code=holding.code,
-                              what=f'익절 {self.bend_line}%',
-                              order_price=detail.price)
+
+            try:
+                if earnings_rate < self.stop_line:
+                    # 손절
+                    self.try_sell(code=holding.code,
+                                  what=f'손절 {self.stop_line}%',
+                                  order_price=detail.price)
+                elif earnings_rate > self.bend_line:
+                    # 익절
+                    self.try_sell(code=holding.code,
+                                  what=f'익절 {self.bend_line}%',
+                                  order_price=detail.price)
+            except:
+                logging.exception(f'Failed to sell {detail.code}')
 
     def try_buy(self, code: str, what: str, order_price: int = None):
         if self.wallet.has(code):
@@ -159,6 +167,8 @@ class Simulator(abc.ABC):
 
         order_count = int(100_0000 / order_price)
         order_total = order_price * order_count
+
+        traders.buy(code=code, price=order_price, count=order_count)
         self.wallet.put(holding=Holding(code=code, count=order_count, price=order_price))
         Record(
             what=what,
@@ -169,7 +179,7 @@ class Simulator(abc.ABC):
             order_count=order_count,
             total=order_total
         ).summit(logger=self.logger, warren_session=self.warren_session)
-        traders.buy(code=code, price=order_price, count=order_count)
+
 
     def try_sell(self, code: str, what: str, order_price: int = None):
         if not self.wallet.has(code):
@@ -263,7 +273,11 @@ class Simulator_1(Simulator):
                     }
 
                     self.warren_session.send(dict_to_msg(ma_dict))
-                    self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
+
+                    try:
+                        self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
+                    except:
+                        logging.exception(f'Failed to sell {detail.code}')
 
         # 모든 취급 종목에 대해...
         for detail in stocks.get_details(self.codes):

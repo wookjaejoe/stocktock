@@ -1,5 +1,4 @@
 import logging
-import threading
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -111,14 +110,7 @@ class OrderManager:
             self.review(order_num)
             return order_num
         else:
-            pass # todo
-            # logging.error(f'ORDER FAILURE({req_status}) - {err_msg}')
-            #
-            # if ret == 4:
-            #     time.sleep(20)
-            #
-            # logging.info(f'Retrying to order...')
-            # self.order(order_type, code, price, count)
+            raise RuntimeError(f'Order failure: {err_msg}')
 
     def review(self, order_num: int):
         # todo: 1분뒤
