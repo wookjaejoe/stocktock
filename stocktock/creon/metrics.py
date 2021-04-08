@@ -1,11 +1,9 @@
 import logging
-from datetime import date, timedelta
 from enum import Enum
 from typing import *
 
-from model import Candle
 from creon import charts
-
+from model import Candle
 
 
 class MA(Enum):
@@ -39,22 +37,25 @@ class MaCalculator:
                 count=150
             )
 
-    def get(self, ma_type: MA, cur_price=0, pos=0):
+    def get(self, length: int, cur_price=0, pos=0):
         """
         Ex) 오늘 ma 조회 get(ma, cur_price)
         Ex) 어제 ma 조회 get(ma, pos=-1)
         """
+
         closes = [cd.close for cd in self.chart] + [cur_price]
         if pos:
-            return avg(closes[-ma_type.value + pos: pos])
+            assert len(closes) >= -length + pos, 'Not enough chart'
+            return avg(closes[-length + pos: pos])
         else:
-            return avg(closes[-ma_type.value:])
+            assert len(closes) >= -length, 'Not enough chart'
+            return avg(closes[-length:])
 
     def is_straight(self):
         try:
-            ma_20 = self.get(ma_type=MA.MA_20, pos=-1)
-            ma_60 = self.get(ma_type=MA.MA_60, pos=-1)
-            ma_120 = self.get(ma_type=MA.MA_120, pos=-1)
+            ma_20 = self.get(length=20, pos=-1)
+            ma_60 = self.get(length=60, pos=-1)
+            ma_120 = self.get(length=120, pos=-1)
             return ma_20 > ma_60 > ma_120
         except:
             logging.warning(f'Failed to check {self.code} is straight')

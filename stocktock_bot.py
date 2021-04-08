@@ -8,7 +8,7 @@ from utils import log
 
 log.init(logging.DEBUG)
 
-from creon import stocks, mas
+from creon import stocks, metrics
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(basedir, 'stocktock'))
@@ -20,7 +20,7 @@ def main():
     available_codes = stocks.get_availables()
 
     # 정배열만 필터링
-    available_codes = [code for code in available_codes if mas.get_calculator(code).is_straight()]
+    available_codes = [code for code in available_codes if metrics.get_calculator(code).is_straight()]
     print(f'정배열 개수: {len(available_codes)}')
 
     # 시총 제한

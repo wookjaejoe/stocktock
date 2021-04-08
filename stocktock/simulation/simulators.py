@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import *
 
-from creon import stocks, mas, traders
+from creon import stocks, metrics, traders
 from utils import calc
 from utils.slack import WarrenSession, Message
 
@@ -222,10 +222,10 @@ class Simulator_2(Simulator):
         for detail in details:
             try:
                 # 전일 기준 5MA, 20MA 구한다
-                ma_calc = mas.get_calculator(detail.code)
-                ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
-                ma_20_yst = ma_calc.get(mas.MA.MA_20, pos=-1)
-                ma_60_yst = ma_calc.get(mas.MA.MA_60, pos=-1)
+                ma_calc = metrics.get_calculator(detail.code)
+                ma_5_yst = ma_calc.get(5, pos=-1)
+                ma_20_yst = ma_calc.get(20, pos=-1)
+                ma_60_yst = ma_calc.get(60, pos=-1)
 
                 if ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.price < ma_5_yst * 1.025:
                     self.try_buy(
@@ -256,10 +256,10 @@ class Simulator_1(Simulator):
 
     def run(self):
         for detail in stocks.get_details([holding.code for holding in self.wallet.holdings]):
-            ma_calc = mas.get_calculator(detail.code)
-            ma_5_cur = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
-            ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
-            ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
+            ma_calc = metrics.get_calculator(detail.code)
+            ma_5_cur = ma_calc.get(5, cur_price=detail.price)
+            ma_5_yst = ma_calc.get(5, pos=-1)
+            ma_10_yst = ma_calc.get(10, pos=-1)
 
             # 데드크로스이면, 판다
             if ma_5_yst > ma_10_yst > ma_5_cur:
@@ -283,11 +283,11 @@ class Simulator_1(Simulator):
         for detail in stocks.get_details(self.codes):
             try:
                 # 전일 기준 5MA, 20MA 구한다
-                ma_calc = mas.get_calculator(detail.code)
-                ma_5_cur = ma_calc.get(mas.MA.MA_5, cur_price=detail.price)
-                ma_5_yst = ma_calc.get(mas.MA.MA_5, pos=-1)
-                ma_10_cur = ma_calc.get(mas.MA.MA_10, cur_price=detail.price)
-                ma_10_yst = ma_calc.get(mas.MA.MA_10, pos=-1)
+                ma_calc = metrics.get_calculator(detail.code)
+                ma_5_cur = ma_calc.get(5, cur_price=detail.price)
+                ma_5_yst = ma_calc.get(5, pos=-1)
+                ma_10_cur = ma_calc.get(10, cur_price=detail.price)
+                ma_10_yst = ma_calc.get(10, pos=-1)
 
                 # 골든크로스이면, 산다
                 if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
