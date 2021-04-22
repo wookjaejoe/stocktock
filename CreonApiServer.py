@@ -14,14 +14,14 @@ import flask_cors
 import jsons
 from flask import Flask, request, send_file
 from werkzeug.serving import WSGIRequestHandler
-from datetime import timedelta
 
 from creon import stocks
 from creon import charts
 from creon.exceptions import CreonError
 from creon.connection import connector as creon_connector
-from datetime import date
+from datetime import date, timedelta
 from dataclasses import dataclass
+from simstock import BreakAbove5MaEventSimulator
 
 # set protocol HTTP/1.1
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
@@ -105,7 +105,6 @@ def get_stocks():
 
 @app.route('/charts')
 def get_charts():
-    # todo: 이거 어노테이션으로 파라미터 처리할 수 있겠다.
     check_required('code', 'chart_type', 'begin', 'end')
 
     # 종목 코드
@@ -133,6 +132,47 @@ def get_charts():
                                          end=end))
 
 
+@app.route('/metrics')
+def get_metrics():
+    code = request.args.get('code')
+    begin: date = parse_datetime(request.args.get('begin')).date()
+    end: date = parse_datetime(request.args.get('end')).date()
+
+    candles = charts.request_by_term(
+        code=code,
+        chart_type=charts.ChartType.DAY,
+        begin=begin - timedelta(days=300),
+        end=end
+    )
+
+    def ma(at: date, length: int):
+        closes = [candle.close for candle in candles if candle.date <= at][-length:]
+        if len(closes) != length:
+            return None
+
+        return int(sum(closes) / length)
+
+    result = []
+    cur = begin
+    while True:
+        if cur > end:
+            break
+
+        result.append({
+            'date': cur,
+            'moving_average': {
+                '120': ma(cur, 120),
+                '60': ma(cur, 60),
+                '20': ma(cur, 20),
+                '5': ma(cur, 5)
+            }
+        })
+
+        cur += timedelta(days=1)
+
+    return asjson(result)
+
+
 @dataclass
 class PostSimulationsBody:
     code: str
@@ -155,8 +195,6 @@ def post_simulations():
     )
     return asjson(simulator.start())
 
-
-from simstock import BreakAbove5MaEventSimulator
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0',
