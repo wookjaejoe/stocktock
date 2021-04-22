@@ -255,27 +255,18 @@ class BreakAbove5MaEventSimulator(Simulator):
                 sell_amount = 0
 
             if sell_amount:
-                self._sell(
-                    dt=datetime.combine(candle.date, candle.time),
-                    price=cur_price,
-                    count=self.wallet.amount_to_count(self.code, sell_amount)
-                )
                 self.wallet.sell(datetime.combine(candle.date, candle.time),
                                  self.code,
                                  sell_price=cur_price,
                                  sell_amount=sell_amount)
-
-            # TODO: 넣을지 말지 확인
-            # candle_time = candle.datetime.time()
-            # elif 1515 < candle_time.hour * 100 + candle_time.minute < 1520 and earnings_rate > 3.5:
-            #     # 장종료전에 마감해보자
-            #     self.wallet.sell(candle.datetime, self.code, cur_price)
+                self._sell(datetime.combine(candle.date, candle.time), cur_price, sell_amount)
         else:  # 미보유 종목에 대한 매수 판단
-            # 정배열 판단 & daily_candle.open < ma_5 <= cur_price < ma_5 * 1.02
-            if ma_120_yst < ma_60_yst < ma_20_yst < daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.02:
-                self._buy(datetime.combine(candle.date, candle.time), cur_price, int(BUY_LIMIT / cur_price))
+            # 120MA < 60MA < 5MA < 20MA and 5MA 상향돌파
+            if ma_120_yst < ma_60_yst < ma_5_yst < ma_20_yst and daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.025:
+                count = int(BUY_LIMIT / cur_price)
                 self.wallet.buy(datetime.combine(candle.date, candle.time), code=self.code, price=cur_price,
-                                count=int(BUY_LIMIT / cur_price))
+                                count=count)
+                self._buy(datetime.combine(candle.date, candle.time), cur_price, count)
 
 
 class GoldenDeadCrossSimulator(Simulator):

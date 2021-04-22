@@ -6,17 +6,20 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import *
+
+from dateutil.parser import parse as parse_datetime
 
 from creon import stocks, metrics, traders
 from utils import calc
 from utils.slack import WarrenSession, Message
-
-# 취급 코드들
+from utils.strings import strip_multiline_string
 
 
 @dataclass
 class Holding:
+    created: datetime
     code: str
     count: int
     price: int
@@ -40,17 +43,20 @@ class Wallet:
 
         with open(self.path, 'r', encoding='utf-8') as f:
             csv_reader = csv.reader(f)
+
             for line in csv_reader:
-                code = line[0]
-                count = int(line[1])
-                price = int(line[2])
-                self.holdings.append(Holding(code, count, price))
+                line = [s.strip() for s in line]
+                created = parse_datetime(line[0])
+                code = line[1]
+                count = int(line[2])
+                price = int(line[3])
+                self.holdings.append(Holding(created, code, count, price))
 
     def save(self):
         with open(self.path, 'w', encoding='utf-8', newline='') as f:
             csv_writer = csv.writer(f)
             for holding in self.holdings:
-                csv_writer.writerow([holding.code, holding.count, holding.price])
+                csv_writer.writerow([holding.created, holding.code, holding.count, holding.price])
 
     def has(self, code):
         return code in [holding.code for holding in self.holdings]
@@ -70,7 +76,7 @@ class Wallet:
 
 
 @dataclass
-class Record:
+class OrderRecord:
     what: str
     order_type: str
     code: str
@@ -80,22 +86,53 @@ class Record:
     total: int
     earning_rate: float = None
     earning_price: int = None
+    memo: str = None
 
     def summit(self, logger, warren_session: WarrenSession):
-        msg = ':dollar: ' + ', '.join(['N/A' if v is None else str(v) for v in list(self.__dict__.values())])
+        if self.order_type == 'BUY':
+            emoji = ':moneybag:'
+        else:
+            try:
+                int(self.earning_rate)  # check number
+                if self.earning_rate > 0:
+                    emoji = ':smiley:'
+                else:
+                    emoji = ':rage:'
+            except:
+                emoji = ''
+
+        msg = f'''
+        {emoji} {self.what}
+        {self.order_type} {self.name}({self.code}) for ₩{self.order_price} × {self.order_count}: ₩{self.total}
+        '''
+
+        if self.earning_price and self.earning_rate:
+            msg += f'''
+            {'+' if self.earning_price >= 0 else ''}{self.earning_price}({'+' if round(self.earning_rate, 2) >= 0 else ''}{round(self.earning_rate, 2)}%)
+            '''
+
+        if self.memo:
+            msg += f'''
+            ```
+            {self.memo}
+            ```
+            '''
+
+        msg = strip_multiline_string(msg)
         warren_session.send(Message(msg))
         logger.critical(msg)
 
 
-class Simulator(abc.ABC):
+class Bot(abc.ABC):
     def __init__(self, name, codes):
         self.name = name
         self.codes = codes
         self.wallet = Wallet(name)
         self.logger = logging.getLogger(name)
         self.warren_session: Optional[WarrenSession] = None
-        self.bend_line = 10
-        self.stop_line = -5
+        self.bend_line = 5
+        self.stop_line = -3
+        self.max_holding_count = 70
 
     @abc.abstractmethod
     def run(self):
@@ -157,8 +194,12 @@ class Simulator(abc.ABC):
             except:
                 logging.exception(f'Failed to sell {detail.code}')
 
-    def try_buy(self, code: str, what: str, order_price: int = None):
+    def try_buy(self, code: str, what: str, order_price: int = None, memo: str = None):
         if self.wallet.has(code):
+            return
+
+        if len(self.wallet.holdings) >= self.max_holding_count:
+            logging.warning('The number of holdings has reached the maximum holdings.')
             return
 
         if not order_price:
@@ -168,18 +209,21 @@ class Simulator(abc.ABC):
         order_count = int(100_0000 / order_price)
         order_total = order_price * order_count
 
-        traders.buy(code=code, price=order_price, count=order_count)
-        self.wallet.put(holding=Holding(code=code, count=order_count, price=order_price))
-        Record(
-            what=what,
-            order_type='BUY',
-            code=code,
-            name=stocks.get_name(code),
-            order_price=order_price,
-            order_count=order_count,
-            total=order_total
-        ).summit(logger=self.logger, warren_session=self.warren_session)
-
+        try:
+            traders.buy(code=code, price=order_price, count=order_count)
+            self.wallet.put(Holding(created=datetime.now(), code=code, count=order_count, price=order_price))
+            OrderRecord(
+                what=what,
+                order_type='BUY',
+                code=code,
+                name=stocks.get_name(code),
+                order_price=order_price,
+                order_count=order_count,
+                total=order_total,
+                memo=memo
+            ).summit(logger=self.logger, warren_session=self.warren_session)
+        except:
+            logging.exception('Failed to try to buy ' + code)
 
     def try_sell(self, code: str, what: str, order_price: int = None):
         if not self.wallet.has(code):
@@ -193,22 +237,26 @@ class Simulator(abc.ABC):
 
         order_total = order_price * holding.count
         holding_total = holding.price * holding.count
-        self.wallet.delete(code)
-        Record(
-            what=what,
-            order_type='SELL',
-            code=code,
-            name=stocks.get_name(code),
-            order_price=order_price,
-            order_count=holding.count,
-            total=order_total,
-            earning_price=order_total - holding_total,
-            earning_rate=calc.earnings_ratio(holding.price, order_price)
-        ).summit(logger=self.logger, warren_session=self.warren_session)
-        traders.sell(code=code, price=order_price, count=holding.count)
+
+        try:
+            traders.sell(code=code, price=order_price, count=holding.count)
+            self.wallet.delete(code)
+            OrderRecord(
+                what=what,
+                order_type='SELL',
+                code=code,
+                name=stocks.get_name(code),
+                order_price=order_price,
+                order_count=holding.count,
+                total=order_total,
+                earning_price=order_total - holding_total,
+                earning_rate=calc.earnings_ratio(holding.price, order_price)
+            ).summit(logger=self.logger, warren_session=self.warren_session)
+        except:
+            logging.exception('Failed to try to sell ' + code)
 
 
-class Simulator_2(Simulator):
+class Simulator_2(Bot):
     """
     2번
     """
@@ -231,79 +279,14 @@ class Simulator_2(Simulator):
                     self.try_buy(
                         code=detail.code,
                         what='5MA 상향돌파',
-                        order_price=detail.price
+                        order_price=detail.price,
+                        memo=strip_multiline_string(
+                            f'''
+                            매수 조건 만족:
+                            ma_60_yst < ma_5_yst < ma_20_yst and open < ma_5_yst <= price < ma_5_yst * 1.025
+                            {round(ma_60_yst, 2)} < {round(ma_5_yst, 2)} < {round(ma_20_yst, 2)} and {detail.open} < {round(ma_5_yst, 2)} <= {detail.price} < {round(ma_5_yst * 1.025, 2)} 
+                            '''
+                        )
                     )
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
-
-
-def dict_to_msg(d: dict):
-    msg = '```'
-    msg += '\n'.join([f'{k}: {v}' for k, v in d.items()])
-    msg += '```'
-    return Message(msg)
-
-
-class Simulator_1(Simulator):
-    """
-    2번
-    """
-
-    def __init__(self, codes):
-        super().__init__('골든데드크로스', codes)
-        self.bend_line = 12
-        self.stop_line = -5
-
-    def run(self):
-        for detail in stocks.get_details([holding.code for holding in self.wallet.holdings]):
-            ma_calc = metrics.get_calculator(detail.code)
-            ma_5_cur = ma_calc.get(5, cur_price=detail.price)
-            ma_5_yst = ma_calc.get(5, pos=-1)
-            ma_10_yst = ma_calc.get(10, pos=-1)
-
-            # 데드크로스이면, 판다
-            if ma_5_yst > ma_10_yst > ma_5_cur:
-                if self.wallet.has(detail.code):
-                    ma_dict = {
-                        'code    ': detail.code,
-                        'name    ': detail.name,
-                        'yst  5ma': ma_5_yst,
-                        'yst 10ma': ma_10_yst,
-                        'cur  5ma': ma_5_cur,
-                    }
-
-                    self.warren_session.send(dict_to_msg(ma_dict))
-
-                    try:
-                        self.try_sell(code=detail.code, what='데드크로스', order_price=detail.price)
-                    except:
-                        logging.exception(f'Failed to sell {detail.code}')
-
-        # 모든 취급 종목에 대해...
-        for detail in stocks.get_details(self.codes):
-            try:
-                # 전일 기준 5MA, 20MA 구한다
-                ma_calc = metrics.get_calculator(detail.code)
-                ma_5_cur = ma_calc.get(5, cur_price=detail.price)
-                ma_5_yst = ma_calc.get(5, pos=-1)
-                ma_10_cur = ma_calc.get(10, cur_price=detail.price)
-                ma_10_yst = ma_calc.get(10, pos=-1)
-
-                # 골든크로스이면, 산다
-                if ma_5_yst < ma_10_yst < ma_5_cur < ma_10_cur * 1.03:
-                    if not self.wallet.has(detail.code):
-                        ma_dict = {
-                            'code    ': detail.code,
-                            'name    ': detail.name,
-                            'yst  5ma': ma_5_yst,
-                            'yst 10ma': ma_10_yst,
-                            'cur  5ma': ma_5_cur,
-                            'cur 10ma': ma_10_cur
-                        }
-
-                        self.warren_session.send(dict_to_msg(ma_dict))
-                        self.logger.info(f'{detail.code} {detail.name} - {ma_5_yst} < {ma_10_yst} < {ma_5_cur} < {ma_10_cur * 1.03}')
-                        self.try_buy(code=detail.code, what='골든크로스', order_price=detail.price)
-            except:
-                logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
-

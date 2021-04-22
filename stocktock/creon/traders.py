@@ -85,12 +85,13 @@ class OrderManager:
         td_311.SetInputValue(7, "0")  # 주문 조건 구분 코드, 0: 기본 1: IOC 2:FOK
         td_311.SetInputValue(8, "01")  # 주문호가 구분코드 - 01: 보통
         ret = td_311.BlockRequest()
+        logging.info(f'td_311.BlockRequest() => {ret}')
 
         # 만약 4를 리턴받은 경우는 15초동안 호출 제한을 초과한 경우로 잠시 후 다시 요청이 필요 합니다.
         # assert ret == 0, f'주문 요청 오류({ret})'  # 0: 정상,  그 외 오류, 4: 주문요청제한 개수 초과
         req_status = td_311.GetDibStatus()
         err_msg = td_311.GetDibMsg1()
-        if req_status == 0:
+        if req_status == 0 or req_status == -1:  # -1 미보유
             order_detail = {
                 '주문종목코드': td_311.GetHeaderValue(0),
                 '계좌번호': td_311.GetHeaderValue(1),
