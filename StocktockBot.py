@@ -13,8 +13,8 @@ from creon import stocks, metrics
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(basedir, 'stocktock'))
 
-
 from bot import Simulator_2
+from utils.slack import Message
 
 
 def main():
@@ -33,6 +33,8 @@ def main():
     market_open_time = datetime.time(hour=9, minute=0, second=0)
     logging.info('APP STARTED')
     logging.info(f'장시작 확인 및 대기 - 장시작: {market_open_time}')
+
+    trader = Simulator_2(available_codes)
     while True:
         now = datetime.datetime.now()
 
@@ -42,9 +44,13 @@ def main():
         time.sleep(1)
 
     logging.info('LET START SIMULATIONS')
-    Simulator_2(available_codes).start()
+    trader.start()
 
     while True:
+        if datetime.datetime.now().time() > datetime.time(hour=16, minute=0, second=0):
+            trader.warren_session.send(Message('Session will be closed.'))
+            break
+
         time.sleep(1)
 
 
