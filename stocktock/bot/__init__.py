@@ -158,7 +158,7 @@ class Bot(abc.ABC):
 
                 time.sleep(5)
 
-        threading.Thread(target=work).start()
+        threading.Thread(target=work, daemon=True).start()
 
     def check_stop_line(self):
         details: Dict[str, stocks.StockDetail2] = {

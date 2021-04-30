@@ -85,7 +85,7 @@ class WarrenSession(Warren):
         ])
 
         self.ts = super(WarrenSession, self).send(Message(initial_msg))
-        threading.Thread(target=self.start_consuming).start()
+        threading.Thread(target=self.start_consuming, daemon=True).start()
 
     def start_consuming(self):
         sup = super(WarrenSession, self)

@@ -10,7 +10,7 @@ from model import Candle
 class EventPublisher(abc.ABC):
 
     def start_async(self):
-        threading.Thread(target=self._start).start()
+        threading.Thread(target=self._start, daemon=True).start()
 
     def start(self):
         self._start()
