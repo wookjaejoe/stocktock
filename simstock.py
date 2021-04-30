@@ -13,7 +13,8 @@ from model import Candle
 from utils import calc, log
 
 log.init(logging.DEBUG)
-import simulation.events
+
+import bot.events
 
 from creon import charts, stocks
 
@@ -141,7 +142,7 @@ class Simulator:
         self.wallet = Wallet()
         self.code = code
         self.result = SimulationResult(code=normalize(self.code), name=stocks.find(code).name, begin=begin, end=end)
-        self.candle_provider = simulation.events.MinuteCandleProvdider(code, begin, end)
+        self.candle_provider = bot.events.MinuteCandleProvdider(code, begin, end)
         self.candle_provider.subscribers.append(self.on_candle)
         self.candle_provider.subscribers.append(lambda candle: self.result.candles.append(candle))
         self.daily_candles: List[Candle] = charts.request_by_term(
@@ -259,7 +260,11 @@ class BreakAbove5MaEventSimulator(Simulator):
                                  self.code,
                                  sell_price=cur_price,
                                  sell_amount=sell_amount)
-                self._sell(datetime.combine(candle.date, candle.time), cur_price, sell_amount)
+                self._sell(
+                    dt=datetime.combine(candle.date, candle.time),
+                    price=cur_price,
+                    count=int(sell_amount * self.wallet.get(self.code).count)
+                )
         else:  # 미보유 종목에 대한 매수 판단
             # 120MA < 60MA < 5MA < 20MA and 5MA 상향돌파
             if ma_120_yst < ma_60_yst < ma_5_yst < ma_20_yst and daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.025:
