@@ -13,8 +13,7 @@ from model import Candle
 from utils import calc, log
 
 log.init(logging.DEBUG)
-
-import bot.events
+import creon.provider
 
 from creon import charts, stocks
 
@@ -142,7 +141,7 @@ class Simulator:
         self.wallet = Wallet()
         self.code = code
         self.result = SimulationResult(code=normalize(self.code), name=stocks.find(code).name, begin=begin, end=end)
-        self.candle_provider = bot.events.MinuteCandleProvdider(code, begin, end)
+        self.candle_provider = creon.provider.MinuteCandleProvdider(code, begin, end)
         self.candle_provider.subscribers.append(self.on_candle)
         self.candle_provider.subscribers.append(lambda candle: self.result.candles.append(candle))
         self.daily_candles: List[Candle] = charts.request_by_term(

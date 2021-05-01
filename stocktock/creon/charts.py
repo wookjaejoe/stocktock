@@ -25,6 +25,7 @@ class ChartType(Enum):
 # noinspection DuplicatedCode
 @limit_safe(req_type=ReqType.NON_TRADE)
 def request_by_term(code: str, chart_type: ChartType, begin: date, end: date, period=1):
+    assert end - begin <= timedelta(days=8), f'The period limit exceeded.'
     code = find(code).code
     chart = stockchart()
     chart.SetInputValue(0, code)  # 종목코드

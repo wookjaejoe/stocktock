@@ -25,6 +25,9 @@ class DatabaseConfig:
     host: str
     port: str
 
+    def get_url(self, dbname: str):
+        return f'{self.scheme}{self.user}:{self.pw}@{self.host}:{self.port}/{dbname}'
+
 
 @dataclass
 class Configuration:

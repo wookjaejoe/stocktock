@@ -1,9 +1,8 @@
 from datetime import date, timedelta
 
-import database.database as db
+import database.candles.minute as db
 from creon import charts as creon_charts
 from creon import stocks as creon_stocks
-import logging
 
 
 def update_stocks():
