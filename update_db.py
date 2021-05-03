@@ -145,7 +145,6 @@ class MinuteCandlesUpdater(CandlesUpdater):
                 if end > self.end:
                     end = self.end
 
-                print(begin, end)
                 if day_table.exists(date=begin) and not minute_table.exists(date=begin):
                     candles = charts.request_by_term(
                         code=code,
