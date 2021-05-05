@@ -21,7 +21,7 @@ url = config.database.get_url('day_candles')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class DayCandleDynamicTable(AbstractDynamicTable[DayCandle]):
+class DayCandleTable(AbstractDynamicTable[DayCandle]):
 
     def __init__(self, code):
         columns = [Column('date', Date, primary_key=True),
@@ -43,4 +43,4 @@ class DayCandleDynamicTable(AbstractDynamicTable[DayCandle]):
                 begin <= self.proxy.date,
                 self.proxy.date <= end
             )
-        )
+        ).all()

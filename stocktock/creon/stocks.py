@@ -10,7 +10,7 @@ from .com import *
 
 
 class MarketType(Enum):
-    EXCHANGE = 1  # 거래소
+    KOSPI = 1  # 거래소
     KOSDAQ = 2  # 코스닥
 
 
@@ -106,7 +106,7 @@ def get_all(market_type: MarketType) -> List[Stock]:
     return result
 
 
-ALL_STOCKS = get_all(MarketType.EXCHANGE) + get_all(MarketType.KOSDAQ)
+ALL_STOCKS = get_all(MarketType.KOSPI) + get_all(MarketType.KOSDAQ)
 
 
 def find(code: str) -> Optional[Stock]:

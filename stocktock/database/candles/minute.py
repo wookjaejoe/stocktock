@@ -21,7 +21,7 @@ url = config.database.get_url('minute_candles')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class MinuteCandleDynamicTable(AbstractDynamicTable):
+class MinuteCandleTable(AbstractDynamicTable):
 
     def __init__(self, code):
         columns = [Column('date', Date, primary_key=True),
@@ -33,6 +33,9 @@ class MinuteCandleDynamicTable(AbstractDynamicTable):
                    Column('vol', Integer, nullable=False)]
 
         super().__init__(engine, MinuteCandle, code, columns)
+
+    def find_by_date(self, d: date) -> List[MinuteCandle]:
+        return self.query().filter_by(date=d).all()
 
     def find_by_datetime(self, d: date, t: time) -> Optional[MinuteCandle]:
         return self.query().filter_by(date=d, time=t).first()

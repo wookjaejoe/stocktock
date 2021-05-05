@@ -7,7 +7,7 @@ import win32com.client
 from creon import stocks
 from creon.com import *
 
-all_stocks = stocks.get_all(stocks.MarketType.EXCHANGE) + stocks.get_all(stocks.MarketType.KOSDAQ)
+all_stocks = stocks.get_all(stocks.MarketType.KOSPI) + stocks.get_all(stocks.MarketType.KOSDAQ)
 td_util = win32com.client.Dispatch('CpTrade.CpTdUtil')
 
 

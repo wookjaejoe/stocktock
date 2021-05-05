@@ -82,7 +82,7 @@ class DayCandlesUpdater(CandlesUpdater):
     def update(self, stock):
         code = normalize(stock.code)
         # check if already exists
-        with db.day_candles.DayCandleDynamicTable(normalize(code)) as table:
+        with db.day_candles.DayCandleTable(normalize(code)) as table:
             if table.exists(date=latest_business_date):
                 # up-to-date
                 logging.info(f'{code}: up-to-date')
@@ -128,8 +128,8 @@ class MinuteCandlesUpdater(CandlesUpdater):
         self.stopped = False
 
         # 차트 테이블 연결
-        minute_table = db.minute_candles.MinuteCandleDynamicTable(code)
-        day_table = db.day_candles.DayCandleDynamicTable(code)
+        minute_table = db.minute_candles.MinuteCandleTable(code)
+        day_table = db.day_candles.DayCandleTable(code)
         try:
             minute_table.open()
             day_table.open()
@@ -183,17 +183,28 @@ class MinuteCandleValidator(MinuteCandlesUpdater):
         super().__init__(period=1)
 
 
+def convert_market_type(market_type) -> db.stocks.Market:
+    if market_type.name == 'KOSPI':
+        return db.stocks.Market.KOSPI
+    elif market_type.name == 'KOSDAQ':
+        return db.stocks.Market.KOSDAQ
+
+    raise RuntimeError(f'Not supported type: {market_type}')
+
+
 class Updater:
 
     def __init__(self):
         self.number = 0
 
     def update(self):
-        with db.StockDynamicTable() as stock_table:
+        with db.StockTable() as stock_table:
             all_stocks = stock_table.all()
             stock_table.insert_all(
                 [
-                    db.stocks.Stock(code=normalize(stock.code), name=stock.name) for stock in stocks.ALL_STOCKS
+                    db.stocks.Stock(code=normalize(stock.code),
+                                    name=stock.name,
+                                    market=convert_market_type(stock.market_type)) for stock in stocks.ALL_STOCKS
                     if normalize(stock.code) not in [stock.code for stock in all_stocks]
                 ]
             )

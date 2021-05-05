@@ -1,28 +1,36 @@
 from dataclasses import dataclass
+from enum import Enum
 
 import sqlalchemy
 from sqlalchemy import Column, String
 
 from config import config
-from .common import AbstractDynamicTable
+from .common import AbstractDynamicTable, StringEnum
+
+
+class Market(Enum):
+    KOSPI = 0
+    KOSDAQ = 1
 
 
 @dataclass
 class Stock:
     code: str
     name: str
+    market: Market
 
 
 url = config.database.get_url('stocks')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class StockDynamicTable(AbstractDynamicTable[Stock]):
+class StockTable(AbstractDynamicTable[Stock]):
 
     def __init__(self):
         columns = [
             Column('code', String, primary_key=True),
             Column('name', String, nullable=False),
+            Column('market', StringEnum(Market), nullable=False)
         ]
 
         super().__init__(engine, Stock, 'stocks', columns)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import *
 
+import sqlalchemy
 from sqlalchemy import MetaData, Column, Table
 from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.orm import sessionmaker, mapper
@@ -82,7 +83,7 @@ class AbstractDynamicTable(Generic[T]):
         """
         Return True if exists, otherwise False
         """
-        return self.query().filter_by(**kwargs).count() > 0
+        return self.query().filter_by(**kwargs).bought_count() > 0
 
     def insert(self, record: T):
         """
@@ -101,3 +102,22 @@ class AbstractDynamicTable(Generic[T]):
             self.session.add(self.proxy(**record.__dict__))
 
         self.session.commit()
+
+
+# noinspection PyAbstractClass
+class StringEnum(sqlalchemy.TypeDecorator):
+    impl = sqlalchemy.String
+
+    def __init__(self, enumtype, *args, **kwargs):
+        super(StringEnum, self).__init__(*args, **kwargs)
+        self._enumtype = enumtype
+
+    def process_bind_param(self, value, dialect):
+        return value.name
+
+    def process_result_value(self, value, dialect):
+        for item in self._enumtype:
+            if item.name == value:
+                return item
+
+        raise RuntimeError(f'Not supported type: {value}')

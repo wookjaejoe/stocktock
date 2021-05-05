@@ -204,7 +204,7 @@ class Bot(abc.ABC):
 
         if not order_price:
             detail = list(stocks.get_details([code]))[0]
-            order_price = detail.price
+            order_price = detail.bought_price
 
         order_count = int(100_0000 / order_price)
         order_total = order_price * order_count
@@ -233,7 +233,7 @@ class Bot(abc.ABC):
 
         if not order_price:
             detail = list(stocks.get_details([code]))[0]
-            order_price = detail.price
+            order_price = detail.bought_price
 
         order_total = order_price * holding.count
         holding_total = holding.price * holding.count
@@ -275,16 +275,16 @@ class Simulator_2(Bot):
                 ma_20_yst = ma_calc.get(20, pos=-1)
                 ma_60_yst = ma_calc.get(60, pos=-1)
 
-                if ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.price < ma_5_yst * 1.025:
+                if ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.bought_price < ma_5_yst * 1.025:
                     self.try_buy(
                         code=detail.code,
                         what='5MA 상향돌파',
-                        order_price=detail.price,
+                        order_price=detail.bought_price,
                         memo=strip_multiline_string(
                             f'''
                             매수 조건 만족:
                             ma_60_yst < ma_5_yst < ma_20_yst and open < ma_5_yst <= price < ma_5_yst * 1.025
-                            {round(ma_60_yst, 2)} < {round(ma_5_yst, 2)} < {round(ma_20_yst, 2)} and {detail.open} < {round(ma_5_yst, 2)} <= {detail.price} < {round(ma_5_yst * 1.025, 2)} 
+                            {round(ma_60_yst, 2)} < {round(ma_5_yst, 2)} < {round(ma_20_yst, 2)} and {detail.open} < {round(ma_5_yst, 2)} <= {detail.bought_price} < {round(ma_5_yst * 1.025, 2)} 
                             '''
                         )
                     )

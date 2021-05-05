@@ -24,13 +24,13 @@ class HoldingStockEvaluation:
     def __init__(self, holding: simulators.Holding, detail: stocks.StockDetail2):
         self.code = holding.code  # 종목코드
         self.name = detail.name  # 종목명
-        self.buy_price = holding.price  # 매수가
+        self.buy_price = holding.bought_price  # 매수가
         self.cur_price = detail.price  # 현재가(종가)
-        self.count = holding.count
-        self.buy_total = holding.price * holding.count  # 매수가 * 개수
-        self.cur_total = detail.price * holding.count  # 현재가 * 개수
-        self.earnings = detail.price * holding.count - holding.price * holding.count  # 수익금
-        self.earnings_rate = calc.earnings_ratio(holding.price, detail.price)  # 수익률
+        self.count = holding.bought_count
+        self.buy_total = holding.bought_price * holding.bought_count  # 매수가 * 개수
+        self.cur_total = detail.price * holding.bought_count  # 현재가 * 개수
+        self.earnings = detail.price * holding.bought_count - holding.bought_price * holding.bought_count  # 수익금
+        self.earnings_rate = calc.earnings_ratio(holding.bought_price, detail.price)  # 수익률
 
 
 @dataclass(init=False)
