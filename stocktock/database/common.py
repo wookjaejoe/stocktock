@@ -9,12 +9,11 @@ from sqlalchemy.orm import sessionmaker, mapper
 T = TypeVar('T')
 
 
-class AbstractTable(Generic[T]):
+class AbstractDynamicTable(Generic[T]):
 
     def __init__(
             self,
             engine,
-
             entity_type: type,
             name: str,
             columns: List[Column]
@@ -32,9 +31,9 @@ class AbstractTable(Generic[T]):
         self.mapper = None
 
     def __enter__(self):
-        return self.connect()
+        return self.open()
 
-    def connect(self):
+    def open(self):
         meta = MetaData()
         self.proxy = type('TableProxy_' + self.name, (self.entity_type,), {})
 

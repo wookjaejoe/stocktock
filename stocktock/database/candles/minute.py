@@ -9,7 +9,7 @@ from sqlalchemy import and_, Column, Integer, Date, Time
 
 from config import config
 from .common import Candle
-from ..common import AbstractTable
+from ..common import AbstractDynamicTable
 
 
 @dataclass
@@ -21,7 +21,7 @@ url = config.database.get_url('minute_candles')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class MinuteCandleTable(AbstractTable):
+class MinuteCandleDynamicTable(AbstractDynamicTable):
 
     def __init__(self, code):
         columns = [Column('date', Date, primary_key=True),
@@ -46,4 +46,4 @@ class MinuteCandleTable(AbstractTable):
                 begin.time() <= self.proxy.time,
                 self.proxy.time <= end.time()
             )
-        )
+        ).all()

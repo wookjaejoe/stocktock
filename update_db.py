@@ -1,6 +1,7 @@
 import abc
 import logging
 from datetime import date, timedelta, datetime
+from multiprocessing.pool import ThreadPool
 from typing import *
 
 import pykrx.stock
@@ -81,7 +82,7 @@ class DayCandlesUpdater(CandlesUpdater):
     def update(self, stock):
         code = normalize(stock.code)
         # check if already exists
-        with db.day_candles.DayCandleTable(normalize(code)) as table:
+        with db.day_candles.DayCandleDynamicTable(normalize(code)) as table:
             if table.exists(date=latest_business_date):
                 # up-to-date
                 logging.info(f'{code}: up-to-date')
@@ -127,11 +128,11 @@ class MinuteCandlesUpdater(CandlesUpdater):
         self.stopped = False
 
         # 차트 테이블 연결
-        minute_table = db.minute_candles.MinuteCandleTable(code)
-        day_table = db.day_candles.DayCandleTable(code)
+        minute_table = db.minute_candles.MinuteCandleDynamicTable(code)
+        day_table = db.day_candles.DayCandleDynamicTable(code)
         try:
-            minute_table.connect()
-            day_table.connect()
+            minute_table.open()
+            day_table.open()
 
             end = None
             for begin in [d for d in business_days if self.begin <= d <= self.end]:
@@ -182,12 +183,35 @@ class MinuteCandleValidator(MinuteCandlesUpdater):
         super().__init__(period=1)
 
 
+class Updater:
+
+    def __init__(self):
+        self.number = 0
+
+    def update(self):
+        with db.StockDynamicTable() as stock_table:
+            all_stocks = stock_table.all()
+            stock_table.insert_all(
+                [
+                    db.stocks.Stock(code=normalize(stock.code), name=stock.name) for stock in stocks.ALL_STOCKS
+                    if normalize(stock.code) not in [stock.code for stock in all_stocks]
+                ]
+            )
+
+            all_stocks = stock_table.all()
+
+        def _update(stock):
+            self.number += 1
+            logging.info(f'{self.number} - {stock.name}({stock.code})')
+            DayCandlesUpdater().update(stock)
+            MinuteCandlesUpdater().update(stock)
+
+        with ThreadPool(5) as pool:
+            pool.map(_update, all_stocks)
+
+
 def main():
-    all_stocks = stocks.ALL_STOCKS
-    for stock in all_stocks:
-        logging.info(f'[{all_stocks.index(stock)}/{len(all_stocks)}] {stock.name}({stock.code})')
-        DayCandlesUpdater().update(stock)
-        MinuteCandlesUpdater().update(stock)
+    Updater().update()
 
 
 if __name__ == '__main__':

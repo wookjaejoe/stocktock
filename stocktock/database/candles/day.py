@@ -9,7 +9,7 @@ from sqlalchemy import and_, Column, Integer, Date
 
 from config import config
 from .common import Candle
-from ..common import AbstractTable
+from ..common import AbstractDynamicTable
 
 
 @dataclass
@@ -21,7 +21,7 @@ url = config.database.get_url('day_candles')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class DayCandleTable(AbstractTable[DayCandle]):
+class DayCandleDynamicTable(AbstractDynamicTable[DayCandle]):
 
     def __init__(self, code):
         columns = [Column('date', Date, primary_key=True),
