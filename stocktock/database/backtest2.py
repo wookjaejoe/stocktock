@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from datetime import date, time, datetime
 from enum import Enum
+from multiprocessing.pool import ThreadPool
 from typing import *
 
 from database.candles import day, minute
 from .metrics import MaCalculator
-from multiprocessing.pool import ThreadPool
 
 
 class BacktestEventType(Enum):
@@ -25,17 +25,17 @@ class BacktestEvent:
 
 @dataclass
 class BacktestSellEvent(BacktestEvent):
+    bought_event: BacktestEvent
     earn_rate: float
 
 
 @dataclass
 class Holding:
-    bought_at: datetime
-    bought_price: int
-    bought_count: int
+    bought_event: BacktestEvent
 
 
 # noinspection PyMethodMayBeStatic
+@dataclass
 class Backtest:
 
     def __init__(self,
@@ -56,32 +56,28 @@ class Backtest:
         self.stop_line = stop_line
         self.events: List[BacktestEvent] = []
         self.holdings: Dict[str, Holding] = {}
-        self.day_charts: Dict[str, List[day.DayCandle]] = {}
 
     def try_order(self, code: str, when: datetime, type_: BacktestEventType, price: int, count: int, descripttion: str):
         if type_ == BacktestEventType.BUY:
             if code in self.holdings:
                 return
             else:
-                self.events.append(
-                    BacktestEvent(
-                        when=when,
-                        code=code,
-                        type=type_,
-                        price=price,
-                        count=count,
-                        description=descripttion
-                    )
+                event = BacktestEvent(
+                    when=when,
+                    code=code,
+                    type=type_,
+                    price=price,
+                    count=count,
+                    description=descripttion
                 )
+                self.events.append(event)
                 self.holdings.update({code: Holding(
-                    bought_at=when,
-                    bought_price=price,
-                    bought_count=count
+                    bought_event=event
                 )})
 
         elif type_ == BacktestEventType.SELL:
             if code in self.holdings:
-                bought_price = self.holdings.get(code).bought_price
+                bought_event = self.holdings.get(code).bought_event
                 self.events.append(
                     BacktestSellEvent(
                         when=when,
@@ -90,7 +86,8 @@ class Backtest:
                         price=price,
                         count=count,
                         description=descripttion,
-                        earn_rate=(price - bought_price) / bought_price
+                        earn_rate=price / bought_event.price,
+                        bought_event=self.holdings.get(code).bought_event
                     )
                 )
                 del self.holdings[code]
@@ -111,7 +108,6 @@ class Backtest:
         with day.DayCandleTable(code) as day_candle_table:
             all_day_candles = day_candle_table.all()
             all_day_candles.sort(key=lambda candle: candle.date)
-            self.day_charts.update({code: all_day_candles})
 
         day_candle = None
         for day_candle in [candle for candle in all_day_candles if self.begin <= candle.date <= self.end]:
@@ -123,10 +119,9 @@ class Backtest:
             ma_120_yst = ma_calc.get(120, pos=-1)
 
             if code in self.holdings:  # 보유중: 매도 시그널 확인
-                if day_candle.low <= self.holdings.get(code).bought_price * self.earn_line <= day_candle.high:
+                if day_candle.low <= self.holdings.get(code).bought_event.price * self.earn_line <= day_candle.high:
                     self.lookup(code, day_candle.date, ma_calc)
-
-                if day_candle.low <= self.stop_line <= day_candle.high:
+                elif day_candle.low <= self.holdings.get(code).bought_event.price * self.stop_line <= day_candle.high:
                     self.lookup(code, day_candle.date, ma_calc)
 
             else:  # 미보유: 매수 시그널 확인
@@ -136,12 +131,13 @@ class Backtest:
                     self.lookup(code, day_candle.date, ma_calc)
 
         if day_candle:
-            close = day_candle.close
-            self.try_order(
-                code, datetime.combine(day_candle.date, time(15, 30)), BacktestEventType.SELL,
-                price=close, count=int(self.limit_buy_amount / close),
-                descripttion=f'기간 종료'
-            )
+            if code in self.holdings:
+                close = day_candle.close
+                self.try_order(
+                    code, datetime.combine(day_candle.date, time(15, 30)), BacktestEventType.SELL,
+                    price=close, count=self.holdings.get(code).bought_event.count,
+                    descripttion=f'기간 종료'
+                )
 
     def lookup(self, code: str, dt: date, ma_calc: MaCalculator):
         ma_5_yst = ma_calc.get(5, pos=-1)
@@ -164,17 +160,17 @@ class Backtest:
                 )
 
             if code in self.holdings:
-                bought_price = self.holdings.get(code).bought_price
+                bought_event = self.holdings.get(code).bought_event
 
-                if close >= bought_price * self.earn_line:
+                if close >= bought_event.price * self.earn_line:
                     self.try_order(
                         code, dt, BacktestEventType.SELL,
-                        price=close, count=int(self.limit_buy_amount / close),
+                        price=close, count=bought_event.count,
                         descripttion=f'{self.earn_line}% 익절'
                     )
-                elif close <= bought_price * self.stop_line:
+                elif close <= bought_event.price * self.stop_line:
                     self.try_order(
                         code, dt, BacktestEventType.SELL,
-                        price=close, count=int(self.limit_buy_amount / close),
+                        price=close, count=bought_event.count,
                         descripttion=f'{self.stop_line}% 손절'
                     )
