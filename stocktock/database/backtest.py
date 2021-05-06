@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from datetime import date, time, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
+from multiprocessing.pool import ThreadPool
 from typing import *
 
-from database.candles import day, minute
+import database.charts
 from .metrics import MaCalculator
 
 
@@ -56,7 +57,7 @@ class Backtest:
         self.events: List[BacktestEvent] = []
         self.holdings: Dict[str, Holding] = {}
 
-    def try_order(self, code: str, when: datetime, type_: BacktestEventType, price: int, count: int, descripttion: str):
+    def try_order(self, code: str, when: datetime, type_: BacktestEventType, price: int, count: int, description: str):
         if type_ == BacktestEventType.BUY:
             if code in self.holdings:
                 return
@@ -68,7 +69,7 @@ class Backtest:
                         type=type_,
                         price=price,
                         count=count,
-                        description=descripttion
+                        description=description
                     )
                 )
                 self.holdings.update({code: Holding(
@@ -87,7 +88,7 @@ class Backtest:
                         type=type_,
                         price=price,
                         count=count,
-                        description=descripttion,
+                        description=description,
                         earn_rate=(price - bought_price) / bought_price
                     )
                 )
@@ -96,78 +97,83 @@ class Backtest:
                 return
 
     def start(self):
-        for code in self.codes:
-            self.test_one(code)
+        days = [self.begin + timedelta(days=x) for x in range(1000) if self.begin + timedelta(days=x) <= self.end]
+        for d in days:
+            self.on_date(d)
 
         return self.events
 
-    def test_one(self, code):
-        with day.DayCandleTable(code) as day_candle_table:
-            all_day_candles = day_candle_table.all()
-            all_day_candles.sort(key=lambda candle: candle.date)
+    # noinspection DuplicatedCode
+    def on_date(self, d: date):
+        with database.charts.DayCandlesTable() as day_table:
+            day_candles = day_table.find_all(begin=self.begin - timedelta(days=365), end=d)
 
-        day_candle = None
-        for day_candle in [candle for candle in all_day_candles if self.begin <= candle.date <= self.end]:
-            candles = [candle for candle in all_day_candles if candle.date <= day_candle.date]
-            ma_calc = MaCalculator(candles=candles)
-            ma_5_yst = ma_calc.get(5, pos=-1)
-            ma_20_yst = ma_calc.get(20, pos=-1)
-            ma_60_yst = ma_calc.get(60, pos=-1)
-            ma_120_yst = ma_calc.get(120, pos=-1)
+        day_candles.sort(key=lambda candle: candle.date)
 
-            if code in self.holdings:  # 보유중: 매도 시그널 확인
+        ma_calc_map = {}
+        for code in self.codes:
+            ma_calc_map.update({code: MaCalculator([candle for candle in day_candles if candle.code == code])})
+
+        # Make whitelist with
+        white_list = []
+        for code in self.codes:
+            ma_calc: MaCalculator = ma_calc_map.get(code)
+            ma_5_yst, ma_20_yst = ma_calc.get(5, pos=-1), ma_calc.get(20, pos=-1)
+            ma_60_yst, ma_120_yst = ma_calc.get(60, pos=-1), ma_calc.get(120, pos=-1)
+            day_candle_at = [candle for candle in ma_calc.candles if candle.date == d]
+            if not day_candle_at:
+                continue
+            day_candle = day_candle_at[0]
+
+            if code in self.holdings:  # 보유중
                 if day_candle.low <= self.holdings.get(code).bought_price * self.earn_line <= day_candle.high:
-                    self.lookup(code, day_candle.date, ma_calc)
-
-                if day_candle.low <= self.stop_line <= day_candle.high:
-                    self.lookup(code, day_candle.date, ma_calc)
-
-            else:  # 미보유: 매수 시그널 확인
+                    white_list.append(code)
+                elif day_candle.low <= self.stop_line <= day_candle.high:
+                    white_list.append(code)
+            else:  # 미보유
                 if ma_120_yst < ma_60_yst < ma_5_yst < ma_20_yst \
                         and day_candle.open < ma_5_yst \
                         and day_candle.low <= ma_5_yst <= day_candle.high:
-                    self.lookup(code, day_candle.date, ma_calc)
+                    white_list.append(code)
 
-        if day_candle:
-            close = day_candle.close
-            self.try_order(
-                code, datetime.combine(day_candle.date, time(15, 30)), BacktestEventType.SELL,
-                price=close, count=int(self.limit_buy_amount / close),
-                descripttion=f'기간 종료'
-            )
+        if not white_list:
+            return
 
-    def lookup(self, code: str, dt: date, ma_calc: MaCalculator):
-        ma_5_yst = ma_calc.get(5, pos=-1)
-        ma_20_yst = ma_calc.get(20, pos=-1)
-        ma_60_yst = ma_calc.get(60, pos=-1)
-        ma_120_yst = ma_calc.get(120, pos=-1)
+        # Backtest with minute candles
+        with database.charts.MinuteCandlesTable(d) as minute_table:
+            minute_candles = minute_table.find_all(codes=white_list)
+            minute_candles.sort(key=lambda candle: datetime.combine(candle.date, candle.time))
 
-        with minute.MinuteCandleTable(code) as minute_candle_table:
-            minute_candles = minute_candle_table.find_by_date(dt)
-            minute_candles.sort(key=lambda candle: datetime.combine(date=candle.date, time=candle.time))
+        if not minute_candles:
+            return
 
-        for minute_candle in minute_candles:
-            close = minute_candle.close
-            dt = datetime.combine(minute_candle.date, minute_candle.time)
-            if ma_5_yst <= close <= ma_5_yst * 1.025:
-                self.try_order(
-                    code, dt, BacktestEventType.BUY,
-                    price=close, count=int(self.limit_buy_amount / close),
-                    descripttion='매수 조건 만족'
-                )
+        # ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.bought_price < ma_5_yst * 1.025:
+        for candle in minute_candles:
+            ma_calc: MaCalculator = ma_calc_map.get(candle.code)
+            ma_5_yst, ma_20_yst = ma_calc.get(5, pos=-1), ma_calc.get(20, pos=-1)
+            ma_60_yst, ma_120_yst = ma_calc.get(60, pos=-1), ma_calc.get(120, pos=-1)
+            day_candle_at = [candle for candle in ma_calc.candles if candle.date == d]
+            day_candle = day_candle_at[0]
 
-            if code in self.holdings:
-                bought_price = self.holdings.get(code).bought_price
-
-                if close >= bought_price * self.earn_line:
+            # ma_60_yst < ma_5_yst < ma_20_yst and open < ma_5_yst <= price < ma_5_yst * 1.025
+            if candle.code in self.holdings:  # 보유중
+                if candle.price >= self.earn_line * candle.close:
                     self.try_order(
-                        code, dt, BacktestEventType.SELL,
-                        price=close, count=int(self.limit_buy_amount / close),
-                        descripttion=f'{self.earn_line}% 익절'
+                        candle.code, datetime.combine(candle.date, candle.time), BacktestEventType.SELL,
+                        price=candle.price, count=self.holdings.get(candle.code).bought_count,
+                        description=f'{(self.earn_line - 1) * 100}% 익절'
                     )
-                elif close <= bought_price * self.stop_line:
+                elif candle.price <= self.stop_line * candle.close:
                     self.try_order(
-                        code, dt, BacktestEventType.SELL,
-                        price=close, count=int(self.limit_buy_amount / close),
-                        descripttion=f'{self.stop_line}% 손절'
+                        candle.code, datetime.combine(candle.date, candle.time), BacktestEventType.SELL,
+                        price=candle.price, count=self.holdings.get(candle.code).bought_count,
+                        description=f'{(self.stop_line - 1) * 100}%손절'
+                    )
+            else:  # 미보유
+                if ma_60_yst < ma_5_yst < ma_20_yst and day_candle.open < ma_5_yst <= candle.price < ma_5_yst * 1.025 \
+                        and day_candle.open < ma_5_yst <= candle.price <= ma_5_yst * 1.025:
+                    self.try_order(
+                        candle.code, datetime.combine(candle.date, candle.time), BacktestEventType.BUY,
+                        price=candle.price, count=int(self.limit_buy_amount / candle.price),
+                        description=f'매수 조건 만족'
                     )

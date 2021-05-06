@@ -20,7 +20,7 @@ class Stock:
     market: Market
 
 
-url = config.database.get_url('stocks')
+url = config.database.get_url('bases')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
@@ -34,3 +34,8 @@ class StockTable(AbstractDynamicTable[Stock]):
         ]
 
         super().__init__(engine, Stock, 'stocks', columns)
+
+
+def all_stocks():
+    with StockTable() as stock_table:
+        return stock_table.all()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from multiprocessing.pool import ThreadPool
 from typing import *
 
 import sqlalchemy
@@ -44,3 +45,21 @@ class DayCandleTable(AbstractDynamicTable[DayCandle]):
                 self.proxy.date <= end
             )
         ).all()
+
+
+class CandleFetcher:
+
+    def __init__(self):
+        self.result: Dict[str, List[DayCandle]] = {}
+
+    def fetch(self, codes: List[str], begin: date, end: date) -> Dict[str, List[DayCandle]]:
+        self.result = {}
+
+        def _fetch(code: str):
+            with DayCandleTable(code) as day_candle_table:
+                self.result.update({code: day_candle_table.find_all_by_term(begin, end)})
+
+        with ThreadPool(5) as pool:
+            pool.map(_fetch, codes)
+
+        return self.result
