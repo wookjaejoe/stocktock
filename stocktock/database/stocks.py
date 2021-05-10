@@ -35,6 +35,9 @@ class StockTable(AbstractDynamicTable[Stock]):
 
         super().__init__(engine, Stock, 'stocks', columns)
 
+    def find(self, code: str) -> Stock:
+        return self.query().filter_by(code=code).first()
+
 
 def all_stocks():
     with StockTable() as stock_table:

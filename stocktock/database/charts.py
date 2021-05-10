@@ -58,11 +58,14 @@ class DayCandlesTable(common.AbstractDynamicTable):
     def find_all(self,
                  codes: List[str] = None,
                  begin: date = None,
-                 end: date = None):
-        assert end >= begin, 'The end must be later than the begin, or equals'
+                 end: date = None) -> List[DayCandle]:
+
+        if begin and end:
+            assert end >= begin, 'The end must be later than the begin, or equals'
+
         return self.query().filter(
             and_(
-                self.proxy.code in codes if codes else True,
+                self.proxy.code.in_(codes) if codes else True,
                 begin <= self.proxy.date if begin else True,
                 self.proxy.date <= end if end else True,
             )
@@ -98,4 +101,4 @@ class MinuteCandlesTable(common.AbstractDynamicTable):
         super().__init__(engine, MinuteCandle, 'minute_candles_' + d.strftime('%Y%m%d'), columns)
 
     def find_all(self, codes: List[str]):
-        return self.query().filter(self.proxy.code in codes).all()
+        return self.query().filter(self.proxy.code.in_(codes)).all()
