@@ -86,7 +86,11 @@ class DayCandlesTable(common.AbstractDynamicTable):
 
 class MinuteCandlesTable(common.AbstractDynamicTable):
 
-    def __init__(self, d: date):
+    def __init__(
+            self,
+            d: date,
+            create_if_not_exists: bool = False
+    ):
         columns = [
             Column('code', String, primary_key=True),
             Column('date', Date, primary_key=True),
@@ -98,7 +102,13 @@ class MinuteCandlesTable(common.AbstractDynamicTable):
             Column('vol', Integer, nullable=False)
         ]
 
-        super().__init__(engine, MinuteCandle, 'minute_candles_' + d.strftime('%Y%m%d'), columns)
+        super().__init__(
+            engine,
+            MinuteCandle,
+            'minute_candles_' + d.strftime('%Y%m%d'),
+            columns,
+            create_if_not_exists=create_if_not_exists
+        )
 
     def find_all(self, codes: List[str]):
         return self.query().filter(self.proxy.code.in_(codes)).all()

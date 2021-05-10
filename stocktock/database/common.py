@@ -17,7 +17,8 @@ class AbstractDynamicTable(Generic[T]):
             engine,
             entity_type: type,
             name: str,
-            columns: List[Column]
+            columns: List[Column],
+            create_if_not_exists: bool = False
     ):
         self.engine = engine
         self.inspector = Inspector.from_engine(self.engine)
@@ -30,6 +31,7 @@ class AbstractDynamicTable(Generic[T]):
         self.session = None
         self.conn = None
         self.mapper = None
+        self.create_if_not_exists = create_if_not_exists
 
     def __enter__(self):
         return self.open()
@@ -46,7 +48,7 @@ class AbstractDynamicTable(Generic[T]):
         )
 
         # Create table if not exists
-        if self.name not in self.inspector.get_table_names():
+        if self.create_if_not_exists and self.name not in self.inspector.get_table_names():
             meta.create_all(bind=self.engine, tables=[self.table])
 
         # Create session

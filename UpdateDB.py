@@ -93,9 +93,14 @@ def update_minute_candles(code: str, begin: date, end: date):
         if not creon_candles:
             continue
 
-        with database.charts.MinuteCandlesTable(d) as minute_candles_table:
+        with database.charts.MinuteCandlesTable(d, True) as minute_candles_table:
             exist_candles = minute_candles_table.find_all([code])
             exist_datetimes = [datetime.combine(candle.date, candle.time) for candle in exist_candles]
+
+            if len([creon_candle for creon_candle in creon_candles if
+                    datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]) > 0:
+                print(code, d.strftime('%Y%m%d'))
+
             minute_candles_table.insert_all(
                 [database.charts.MinuteCandle(
                     code=code,
@@ -112,7 +117,7 @@ def update_minute_candles(code: str, begin: date, end: date):
 
 
 def main():
-    begin = date.today() - timedelta(days=5)
+    begin = date.today() - timedelta(days=365 * 2)
     end = date.today()
     stocks = update_stocks()
 
