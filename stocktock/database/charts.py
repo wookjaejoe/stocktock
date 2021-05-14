@@ -8,19 +8,9 @@ from typing import *
 import sqlalchemy
 from sqlalchemy import Column, Date, Time, Integer, and_, String
 
+from common.model import Candle
 from config import config
-from . import common
-
-
-@dataclass
-class Candle:
-    code: str
-    date: date
-    open: int
-    close: int
-    low: int
-    high: int
-    vol: int
+from .common import AbstractDynamicTable
 
 
 @dataclass
@@ -37,7 +27,7 @@ url = config.database.get_url('charts')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class DayCandlesTable(common.AbstractDynamicTable):
+class DayCandlesTable(AbstractDynamicTable):
 
     def __init__(self):
         columns = [
@@ -52,14 +42,10 @@ class DayCandlesTable(common.AbstractDynamicTable):
 
         super().__init__(engine, DayCandle, 'day_candles', columns)
 
-    def find_by_date(self, d: date) -> List[DayCandle]:
-        return self.query().filter_by(date=d).all()
-
     def find_all(self,
                  codes: List[str] = None,
                  begin: date = None,
-                 end: date = None) -> List[DayCandle]:
-
+                 end: date = None):
         if begin and end:
             assert end >= begin, 'The end must be later than the begin, or equals'
 
@@ -71,20 +57,8 @@ class DayCandlesTable(common.AbstractDynamicTable):
             )
         ).all()
 
-    def find_all_by_term(self, begin: date, end: date) -> List[DayCandle]:
-        assert end >= begin, 'The end must be later than the begin, or equals'
-        return self.query().filter(
-            and_(
-                begin <= self.proxy.date,
-                self.proxy.date <= end,
-            )
-        ).all()
 
-    def find_before(self, end: date):
-        return self.query().filter(self.proxy.date <= end).all()
-
-
-class MinuteCandlesTable(common.AbstractDynamicTable):
+class MinuteCandlesTable(AbstractDynamicTable):
 
     def __init__(
             self,
@@ -110,5 +84,9 @@ class MinuteCandlesTable(common.AbstractDynamicTable):
             create_if_not_exists=create_if_not_exists
         )
 
-    def find_all(self, codes: List[str]):
-        return self.query().filter(self.proxy.code.in_(codes)).all()
+    def find_all(self, codes: List[str], use_yield=False):
+        query = self.query().filter(self.proxy.code.in_(codes))
+        if use_yield:
+            return query.yield_per(count=1000)
+        else:
+            return query.all()

@@ -1,10 +1,13 @@
+# noinspection SpellCheckingInspection
+__author__ = 'wookjae.jo'
+
 from dataclasses import dataclass
 from datetime import date
-from typing import *
-from multiprocessing.pool import ThreadPool
+
 
 @dataclass
 class Candle:
+    code: str
     date: date
     open: int
     close: int

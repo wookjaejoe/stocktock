@@ -132,7 +132,7 @@ class Bot(abc.ABC):
         self.warren_session: Optional[WarrenSession] = None
         self.bend_line = 5
         self.stop_line = -3
-        self.max_holding_count = 70
+        self.max_holding_count = 7000
 
     @abc.abstractmethod
     def run(self):
@@ -226,6 +226,7 @@ class Bot(abc.ABC):
             logging.exception('Failed to try to buy ' + code)
 
     def try_sell(self, code: str, what: str, order_price: int = None):
+        return  # fixme
         if not self.wallet.has(code):
             return
 

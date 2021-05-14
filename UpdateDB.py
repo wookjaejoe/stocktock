@@ -4,7 +4,7 @@ import creon.charts
 import creon.stocks
 import database.charts
 import database.stocks
-
+from multiprocessing.pool import ThreadPool
 
 def normalize(code: str):
     return code[-6:]
@@ -97,37 +97,34 @@ def update_minute_candles(code: str, begin: date, end: date):
             exist_candles = minute_candles_table.find_all([code])
             exist_datetimes = [datetime.combine(candle.date, candle.time) for candle in exist_candles]
 
-            if len([creon_candle for creon_candle in creon_candles if
-                    datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]) > 0:
-                print(code, d.strftime('%Y%m%d'))
+            new_candles = [database.charts.MinuteCandle(
+                code=code,
+                date=creon_candle.date,
+                time=creon_candle.time,
+                open=creon_candle.open,
+                close=creon_candle.close,
+                low=creon_candle.low,
+                high=creon_candle.high,
+                vol=creon_candle.vol
+            ) for creon_candle in creon_candles if
+                datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]
 
-            minute_candles_table.insert_all(
-                [database.charts.MinuteCandle(
-                    code=code,
-                    date=creon_candle.date,
-                    time=creon_candle.time,
-                    open=creon_candle.open,
-                    close=creon_candle.close,
-                    low=creon_candle.low,
-                    high=creon_candle.high,
-                    vol=creon_candle.vol
-                ) for creon_candle in creon_candles if
-                    datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]
-            )
+            if new_candles:
+                print(code, d.strftime('%Y%m%d'))
+                minute_candles_table.insert_all(new_candles)
 
 
 def main():
-    begin = date.today() - timedelta(days=365 * 2)
+    begin = date.today() - timedelta(days=8)
     end = date.today()
     stocks = update_stocks()
 
     def update(code: str):
-        print(1, end='')
         update_day_charts(code, begin, end)
         update_minute_candles(code, begin, end)
 
-    for stock in stocks:
-        update(stock.code)
+    with ThreadPool(5) as pool:
+        pool.map(update, [stock.code for stock in stocks])
 
 
 if __name__ == '__main__':
