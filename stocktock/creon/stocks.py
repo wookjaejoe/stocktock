@@ -4,9 +4,9 @@ import logging
 from dataclasses import dataclass
 
 from retry import retry
-from .exceptions import CreonRequestError
 
 from .com import *
+from .exceptions import CreonRequestError
 
 
 class MarketType(Enum):
@@ -109,10 +109,20 @@ def get_all(market_type: MarketType) -> List[Stock]:
 ALL_STOCKS = get_all(MarketType.KOSPI) + get_all(MarketType.KOSDAQ)
 
 
+class StockNotFound(Exception):
+    def __init__(self, code: str):
+        self.code = code
+
+    def __str__(self):
+        return f'Stock({self.code}) not found'
+
+
 def find(code: str) -> Optional[Stock]:
     for stock in ALL_STOCKS:
         if code in stock.code:
             return stock
+
+    raise StockNotFound(code)
 
 
 available_codes = None

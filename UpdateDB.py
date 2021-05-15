@@ -136,8 +136,8 @@ def main():
         try:
             update_day_candles(code, begin, end)
             update_minute_candles(code, begin, end)
-        except creon.stocks.StockNotFound:
-            pass
+        except creon.stocks.StockNotFound as e:
+            logging.warning(f'Failed to update candles for {code}', exc_info=e)
 
     logging.info('Updating candles...')
     with ThreadPool(5) as pool:
