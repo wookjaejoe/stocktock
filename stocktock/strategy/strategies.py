@@ -25,7 +25,7 @@ class Over5MaStrategy(Strategy):
             buy: Callable
     ):
         try:
-            ma_calc = MaCalculator(day_candles)
+            ma_calc = MaCalculator([candle.close for candle in day_candles])
             ma_5_yst = ma_calc.get(5, pos=-1)
             if day_candles[-1].open < ma_5_yst < cur_price < ma_5_yst * 1.025:
                 buy()

@@ -16,18 +16,9 @@ class MaCalculator:
     주의: 일봉
     """
 
-    def __init__(self, day_candles: List[Candle]):
-        self.candles = day_candles
+    def __init__(self, values: List[int]):
+        self.values = values
 
-    def get(self, length: int, cur_price: int = None, pos: int = 0):
-        """
-        Ex) 오늘 ma 조회 get(ma, cur_price)
-        Ex) 어제 ma 조회 get(ma, pos=-1)
-        """
-
-        closes = [cd.close for cd in self.candles] + [cur_price]
-        assert len(closes) >= length, 'Not enough chart'
-        if pos:
-            return avg(closes[-length + pos: pos])
-        else:
-            return avg(closes[-length:])
+    def get(self, length: int, pos: int = 0):
+        assert len(self.values) >= length, 'Not enough chart'
+        return avg(self.values[-length + pos: pos])
