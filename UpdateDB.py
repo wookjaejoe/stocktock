@@ -1,10 +1,15 @@
+import logging
 from datetime import date, timedelta, datetime
+from multiprocessing.pool import ThreadPool
 
 import creon.charts
 import creon.stocks
 import database.charts
 import database.stocks
-from multiprocessing.pool import ThreadPool
+from utils import log
+
+log.init()
+
 
 def normalize(code: str):
     return code[-6:]
@@ -33,10 +38,12 @@ def update_stocks():
                     market=convert_market_type(creon_stock.market_type)
                 ))
 
+        stock_table.session.commit()
+
     return stock_table.all()
 
 
-def update_day_charts(code: str, begin: date, end: date):
+def update_day_candles(code: str, begin: date, end: date):
     with database.charts.DayCandlesTable() as day_candles_table:
         candles = day_candles_table.find_all(codes=[code])
         creon_candles = creon.charts.request_by_term(
@@ -69,7 +76,6 @@ def update_day_charts(code: str, begin: date, end: date):
         day_candles_table.insert_all(inserts)
 
 
-# todo: 실시간이면 곤란. 오늘 분봉이 모두 만들어지지 않았는데... 그런것이면 많이 곤란...
 def update_minute_candles(code: str, begin: date, end: date):
     if begin > end:
         return
@@ -115,14 +121,25 @@ def update_minute_candles(code: str, begin: date, end: date):
 
 
 def main():
-    begin = date.today() - timedelta(days=8)
+    begin = date.today() - timedelta(days=400)
     end = date.today()
+
+    def date_to_str(d: date):
+        return d.strftime('%Y-%m-%d')
+
+    logging.info(f'STARTED: {date_to_str(begin)} ~ {date_to_str(end)}')
+
+    logging.info('Updating stocks...')
     stocks = update_stocks()
 
     def update(code: str):
-        update_day_charts(code, begin, end)
-        update_minute_candles(code, begin, end)
+        try:
+            update_day_candles(code, begin, end)
+            update_minute_candles(code, begin, end)
+        except creon.stocks.StockNotFound:
+            pass
 
+    logging.info('Updating candles...')
     with ThreadPool(5) as pool:
         pool.map(update, [stock.code for stock in stocks])
 
