@@ -3,8 +3,6 @@ __author__ = 'wookjae.jo'
 
 from typing import *
 
-from common.model import Candle
-
 
 def avg(values: List[int]) -> float:
     return sum(values) / len(values)

@@ -11,10 +11,14 @@ log.init()
 
 def main():
     backtest = Backtest(
-        begin=date.today() - timedelta(days=100),
+        # begin=date(2021, 1, 1),
+        begin=date.today() - timedelta(days=365),
         end=date.today(),
+
         limit_holding_count=100,
         limit_buy_amount=100_0000,
+        limit_keeping_days=20,
+
         earn_line=7,
         stop_line=-5,
         initial_deposit=1_0000_0000,

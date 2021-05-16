@@ -266,28 +266,42 @@ class Simulator_2(Bot):
         super().__init__('5MA_상향돌파', codes)
 
     def run(self):
-        details = stocks.get_details(self.codes)
+        whitelist = []
+        for code in self.codes:
+            try:
+                ma_calc = metrics.get_calculator(code)
+                ma_5_yst = ma_calc.get(5, pos=-1)
+                ma_20_yst = ma_calc.get(20, pos=-1)
+                ma_20_yst_2 = ma_calc.get(20, pos=-2)
+                ma_60_yst = ma_calc.get(60, pos=-1)
+                ma_120_yst = ma_calc.get(120, pos=-1)
+
+                if ma_20_yst > ma_5_yst > ma_60_yst > ma_120_yst \
+                        and ma_20_yst > ma_20_yst_2 \
+                        and len([candle for candle in ma_calc.chart[-5:] if candle.open < candle.close]) > 0:
+                    whitelist.append(code)
+            except:
+                continue
+
+        details = stocks.get_details(whitelist)
+
         # 모든 취급 종목에 대해...
         for detail in details:
             try:
                 # 전일 기준 5MA, 20MA 구한다
                 ma_calc = metrics.get_calculator(detail.code)
                 ma_5_yst = ma_calc.get(5, pos=-1)
-                ma_20_yst = ma_calc.get(20, pos=-1)
-                ma_60_yst = ma_calc.get(60, pos=-1)
-
-                if ma_60_yst < ma_5_yst < ma_20_yst and detail.open < ma_5_yst <= detail.price < ma_5_yst * 1.025:
+                if detail.open < ma_5_yst <= detail.price < ma_5_yst * 1.025:
                     self.try_buy(
                         code=detail.code,
                         what='5MA 상향돌파',
                         order_price=detail.price,
-                        memo=strip_multiline_string(
-                            f'''
-                            매수 조건 만족:
-                            ma_60_yst < ma_5_yst < ma_20_yst and open < ma_5_yst <= price < ma_5_yst * 1.025
-                            {round(ma_60_yst, 2)} < {round(ma_5_yst, 2)} < {round(ma_20_yst, 2)} and {detail.open} < {round(ma_5_yst, 2)} <= {detail.price} < {round(ma_5_yst * 1.025, 2)} 
-                            '''
-                        )
+                        # memo=f'''
+                        #     ma_20_yst > ma_5_yst > ma_60_yst > ma_120_yst
+                        #     and ma_20_yst > ma_20_yst_2
+                        #     and len([candle for candle in ma_calc.chart[-5:] if candle.open < candle.close]) > 0
+                        #     and open < ma_5_yst <= cur_price < ma_5_yst * 1.025
+                        #     '''
                     )
             except:
                 logging.exception(f'Failed to simulate for {detail.code} in {self.name}')
