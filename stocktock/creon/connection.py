@@ -44,7 +44,6 @@ config = Configuration.load()
 
 
 class CreonConnector:
-    cybos = com.cybos()
     reconnecting = False
 
     @classmethod
@@ -64,12 +63,12 @@ class CreonConnector:
 
     @classmethod
     def _disconnect(cls):
-        if cls.cybos.IsConnect:
-            cls.cybos.PlusDisconnect()
+        if com.cybos().IsConnect:
+            com.cybos().PlusDisconnect()
 
     @classmethod
     def connect(cls):
-        if cls.cybos.IsConnect:
+        if com.cybos().IsConnect:
             return
 
         if cls.reconnecting:
@@ -92,7 +91,7 @@ class CreonConnector:
     @classmethod
     def wait_connection(cls, timeout=60):
         for i in range(timeout):
-            if cls.cybos.IsConnect:
+            if com.cybos().IsConnect:
                 return
 
             time.sleep(1)
