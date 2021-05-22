@@ -49,7 +49,7 @@ def update_day_candles(code: str, begin: date, end: date):
         creon_candles = creon.charts.request_by_term(
             code=code,
             chart_type=creon.charts.ChartType.DAY,
-            begin=begin,
+            begin=end - timedelta(days=365 * 5),
             end=end
         )
 
@@ -121,7 +121,7 @@ def update_minute_candles(code: str, begin: date, end: date):
 
 
 def main():
-    begin = date.today() - timedelta(days=400)
+    begin = date.today() - timedelta(days=8)
     end = date.today()
 
     def date_to_str(d: date):
@@ -140,7 +140,7 @@ def main():
             logging.warning(f'Failed to update candles for {code}', exc_info=e)
 
     logging.info('Updating candles...')
-    with ThreadPool(5) as pool:
+    with ThreadPool(2) as pool:
         pool.map(update, [stock.code for stock in stocks])
 
 

@@ -69,7 +69,7 @@ def get_index_ohlcv(ticker: str, fromdate: date, todate: date) -> Dict[date, Ohl
 class Index:
     ticker: str
     name: str
-    values: Dict[date, Ohlcv]
+    data: Dict[date, Ohlcv]
 
 
 @dataclass
@@ -93,7 +93,7 @@ class InterestIndexes:
         return Index(
             ticker=ticker,
             name=stock.get_index_ticker_name(ticker),
-            values=get_index_ohlcv(ticker, fromdate, todate)
+            data=get_index_ohlcv(ticker, fromdate, todate)
         )
 
     @classmethod
