@@ -92,6 +92,20 @@ class MinuteCandleFetcher:
         pass
 
 
+def get_fl_map(codes: List[str], begin: date, end: date):
+    with database.charts.DayCandlesTable() as day_candles_table:
+        candles = day_candles_table.find_all(codes=codes, begin=begin, end=end)
+
+    candles_by_code = {}
+    for candle in candles:
+        if candle.code not in candles_by_code:
+            candles_by_code.update({candle.code: []})
+
+        candles_by_code.get(candle.code).append(candle)
+
+    return {code: (candles[0].open, candles[-1].close) for code, candles in candles_by_code.items()}
+
+
 # noinspection PyMethodMayBeStatic
 class Backtest:
 
@@ -188,7 +202,7 @@ class Backtest:
                 day_candles_map.get(day_candle.code).append(day_candle)
 
         logging.info('Making whitelist...')
-        whitelist = []
+        whitelist = list(self.holdings.keys())
         for stock in [stock for stock in stocks if stock.code in day_candles_map]:
             day_candles = day_candles_map.get(stock.code)
             ma_calc = MaCalculator([candle.close for candle in day_candles])
@@ -232,13 +246,9 @@ class Backtest:
                     self.try_sell(code=code, when=when, price=cur_price, description='손절')
                 # 매도 5+ 거래일 지난 15:00 이후
                 elif holding_days >= 5 and when.time() > time(14, 30):
-                    vol_avg = sum([dc.vol for dc in day_candles_after_bought]) / len(day_candles_after_bought)
                     # 변동성 1% 미만이면, 매도
                     if abs(margin_percent) < 1:
                         self.try_sell(code=code, when=when, price=cur_price, description='미변동')
-                    # 평균 거래량이 매수 당시 거래량보다 작으면 매도 todo: 확인
-                    # elif day_candles_after_bought[0].vol > vol_avg:
-                    #     self.try_sell(code=code, when=when, price=cur_price, description='매수당시거래량 > 평균거래량')
                     # 보유 기간 제한 20일
                     elif holding_days >= self.limit_holding_days:
                         self.try_sell(code=code, when=when, price=cur_price,
@@ -294,6 +304,15 @@ class Backtest:
         for d in [self.begin + timedelta(days=i) for i in range((self.end - self.begin).days + 1)]:
             self.run(d)
             self.daily_logs.append(self.evaluate(d))
+
+        for holding in self.holdings.copy().values():
+            code = holding.bought_event.code
+            _, last = get_fl_map([code], self.begin, self.end).get(code)
+            self.try_sell(
+                code=code,
+                when=datetime.combine(self.end, time(15, 30)),
+                price=last,
+                description='백테스트 종료')
 
         self.finish_time = datetime.now()
 
@@ -398,6 +417,49 @@ class XlsxExporter:
 
         def total_eval(_daily_log: DailyLog):
             return _daily_log.deposit + _daily_log.holding_eval
+
+        ########## ranking ##########
+        events_by_code: [str, List[BacktestEvent]] = {}
+        for event in self.backteset.events:
+            if event.code not in events_by_code:
+                events_by_code.update({event.code: []})
+
+            events_by_code.get(event.code).append(event)
+
+        revenues_by_code = {}
+        for code in events_by_code:
+            events: List[BacktestEvent] = events_by_code.get(code)
+            revenue = 0
+            for event in events:
+                if event.type == BacktestEventType.BUY:
+                    revenue -= event.price * event.count
+                elif event.type == BacktestEventType.SELL:
+                    revenue += event.price * event.count
+                else:
+                    RuntimeError('WTF')
+
+            revenues_by_code.update({code: revenue})
+
+        rows = []
+        fl_map = get_fl_map(list(revenues_by_code.keys()), self.backteset.begin, self.backteset.end)
+        for code in revenues_by_code:
+            revenue = revenues_by_code.get(code)
+            first, last = fl_map.get(code)
+            revenue_rate = round(revenue / self.backteset.limit_buy_amount * 100, 2)
+            margin_rate =round((last - first) / first * 100, 2)
+            row = [
+                code, get_name(code),
+                revenue_rate,
+                first,
+                last,
+                margin_rate,
+                revenue_rate - margin_rate
+            ]
+            rows.append(row)
+
+        # 수익금으로 정렬
+        rows.sort(key=lambda x: x[-1], reverse=True)
+        self.create_table_sheet('ranking', headers=['종목코드', '종목명', '수익율', '시작가', '종료가', '변동율'], rows=rows, index=2)
 
         ########## events ##########
         headers = [

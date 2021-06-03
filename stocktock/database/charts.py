@@ -45,7 +45,7 @@ class DayCandlesTable(AbstractDynamicTable):
     def find_all(self,
                  codes: List[str] = None,
                  begin: date = None,
-                 end: date = None):
+                 end: date = None) -> List[DayCandle]:
         if begin and end:
             assert end >= begin, 'The end must be later than the begin, or equals'
 
@@ -56,6 +56,9 @@ class DayCandlesTable(AbstractDynamicTable):
                 self.proxy.date <= end if end else True,
             )
         ).all()
+
+    def find(self, code: str, at: date) -> DayCandle:
+        return self.query().filter_by(code=code, date=at).first()
 
 
 class MinuteCandlesTable(AbstractDynamicTable):

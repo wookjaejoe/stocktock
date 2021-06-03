@@ -1,7 +1,7 @@
 # noinspection SpellCheckingInspection
 __author__ = 'wookjae.jo'
 
-from datetime import date
+from datetime import date, timedelta
 
 from database.backtest import Backtest
 from utils import log
@@ -11,8 +11,8 @@ log.init()
 
 def main():
     backtest = Backtest(
-        begin=date(2020, 1, 1),
-        end=date(2021, 6, 30),  # 코로나 하락장
+        begin=date(2021, 5, 17) - timedelta(days=365),
+        end=date(2021, 5, 17),
 
         limit_holding_count=100,
         limit_buy_amount=100_0000,
