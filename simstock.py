@@ -255,15 +255,16 @@ class BreakAbove5MaEventSimulator(Simulator):
                 sell_amount = 0
 
             if sell_amount:
-                self.wallet.sell(datetime.combine(candle.date, candle.time),
-                                 self.code,
-                                 sell_price=cur_price,
-                                 sell_amount=sell_amount)
                 self._sell(
                     dt=datetime.combine(candle.date, candle.time),
                     price=cur_price,
                     count=int(sell_amount * self.wallet.get(self.code).count)
                 )
+
+                self.wallet.sell(datetime.combine(candle.date, candle.time),
+                                 self.code,
+                                 sell_price=cur_price,
+                                 sell_amount=sell_amount)
         else:  # 미보유 종목에 대한 매수 판단
             # 120MA < 60MA < 5MA < 20MA and 5MA 상향돌파
             if ma_120_yst < ma_60_yst < ma_5_yst < ma_20_yst and daily_candle.open < ma_5_yst <= cur_price < ma_5_yst * 1.025:
