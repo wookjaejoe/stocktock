@@ -15,7 +15,7 @@ import jsons
 import database.charts
 import database.metrics
 import database.stocks
-from common.metric import MaCalculator
+from common.metric import MaCalculator, NotEnoughChartException
 from strategy.strategies import Over5MaStrategy
 
 with database.stocks.StockTable() as stock_table:
@@ -225,7 +225,9 @@ class Backtest:
 
         logging.info(f'Streaming minute candles...')
         with database.charts.MinuteCandlesTable(d) as minute_candles_table:
-            minute_candles = minute_candles_table.find_all(codes=whitelist, use_yield=True)
+            minute_candles = minute_candles_table.find_all(codes=whitelist)
+
+        minute_candles.sort(key=lambda candle: candle.time)
 
         logging.info(f'Looking details at tbe minute candles for {len(whitelist)} stocks...')
         for minute_candle in minute_candles:
@@ -446,7 +448,7 @@ class XlsxExporter:
             revenue = revenues_by_code.get(code)
             first, last = fl_map.get(code)
             revenue_rate = round(revenue / self.backteset.limit_buy_amount * 100, 2)
-            margin_rate =round((last - first) / first * 100, 2)
+            margin_rate = round((last - first) / first * 100, 2)
             row = [
                 code, get_name(code),
                 revenue_rate,
@@ -459,7 +461,7 @@ class XlsxExporter:
 
         # 수익금으로 정렬
         rows.sort(key=lambda x: x[-1], reverse=True)
-        self.create_table_sheet('ranking', headers=['종목코드', '종목명', '수익율', '시작가', '종료가', '변동율'], rows=rows, index=2)
+        self.create_table_sheet('ranking', headers=['종목코드', '종목명', '수익율(%)', '시작가', '종료가', '변동율(%)', '수익율-변동율(%)'], rows=rows, index=2)
 
         ########## events ##########
         headers = [
@@ -514,26 +516,38 @@ class XlsxExporter:
 
         self.create_table_sheet('daily', headers=headers, rows=rows, index=1)
 
+        fl_map = get_fl_map(
+            codes=[stock.code for stock in stocks],
+            begin=self.backteset.begin,
+            end=self.backteset.end
+        )
+
         ########## summary ##########
         headers = [
             '시작일', '종료일', '구동시간(sec)', '최초 예수금',
             '익절라인(%)', '손절라인(%)', '매매 수수료(%)', '매도 세금(%)',
             '수익금',
             '수익율(%)',
+            '취급 종목 평균 변동율(%)',
             '코스피 증감율(%)', '코스닥 증감율(%)', 'KRX 300 증감율(%)'
         ]
 
+        margin_percentage_list = []
+        for code in fl_map:
+            first, last = fl_map.get(code)
+            margin_percentage_list.append(((last - first) / first) * 100)
+
         kospi_f = list(indexes.kospi.data.values())[0].close
         kospi_l = list(indexes.kospi.data.values())[-1].close
-        kospi_margin = (kospi_l - kospi_f) / kospi_f
+        kospi_margin = (kospi_l - kospi_f) / kospi_f * 100
 
         kosdaq_f = list(indexes.kosdaq.data.values())[0].close
         kosdaq_l = list(indexes.kosdaq.data.values())[-1].close
-        kosdaq_margin = (kosdaq_l - kosdaq_f) / kospi_f
+        kosdaq_margin = (kosdaq_l - kosdaq_f) / kospi_f * 100
 
         krx_300_f = list(indexes.krx_300.data.values())[0].close
         krx_300_l = list(indexes.krx_300.data.values())[-1].close
-        krx_300_margin = (krx_300_l - krx_300_f) / krx_300_f
+        krx_300_margin = (krx_300_l - krx_300_f) / krx_300_f * 100
 
         final_eval = total_eval(self.backteset.daily_logs[-1])
         rows = [[
@@ -542,6 +556,7 @@ class XlsxExporter:
             self.backteset.earn_line, self.backteset.stop_line, self.backteset.fee_percent, self.backteset.tax_percent,
             round(final_eval - self.backteset.initial_deposit),
             round((final_eval - self.backteset.initial_deposit) / self.backteset.initial_deposit * 100, 2),
+            round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
             round(kospi_margin, 2), round(kosdaq_margin, 2), round(krx_300_margin, 2)
         ]]
         self.create_table_sheet('summary', headers=headers, rows=rows, index=0)

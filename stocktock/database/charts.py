@@ -87,7 +87,7 @@ class MinuteCandlesTable(AbstractDynamicTable):
             create_if_not_exists=create_if_not_exists
         )
 
-    def find_all(self, codes: List[str], use_yield=False):
+    def find_all(self, codes: List[str], use_yield=False) -> List[MinuteCandle]:
         query = self.query().filter(self.proxy.code.in_(codes))
         if use_yield:
             return query.yield_per(count=1000)
