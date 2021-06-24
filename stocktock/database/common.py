@@ -85,7 +85,7 @@ class AbstractDynamicTable(Generic[T]):
         """
         Return True if exists, otherwise False
         """
-        return self.query().filter_by(**kwargs).count() > 0
+        return self.query().filter_by(**kwargs).quantity() > 0
 
     def insert(self, record: T):
         """

@@ -45,7 +45,7 @@ def update_stocks():
 
 def update_day_candles(code: str, begin: date, end: date):
     with database.charts.DayCandlesTable() as day_candles_table:
-        candles = day_candles_table.find_all(codes=[code])
+        candles = day_candles_table.find_all_at(codes=[code])
         creon_candles = creon.charts.request_by_term(
             code=code,
             chart_type=creon.charts.ChartType.DAY,

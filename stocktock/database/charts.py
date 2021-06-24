@@ -2,7 +2,7 @@
 __author__ = 'wookjae.jo'
 
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, time, datetime
 from typing import *
 
 import sqlalchemy
@@ -22,12 +22,15 @@ class DayCandle(Candle):
 class MinuteCandle(Candle):
     time: time
 
+    def datetime(self):
+        return datetime.combine(self.date, self.time)
+
 
 url = config.database.get_url('charts')
 engine = sqlalchemy.create_engine(url, client_encoding='utf-8')
 
 
-class DayCandlesTable(AbstractDynamicTable):
+class DayCandlesTable(AbstractDynamicTable[DayCandle]):
 
     def __init__(self):
         columns = [
@@ -42,10 +45,10 @@ class DayCandlesTable(AbstractDynamicTable):
 
         super().__init__(engine, DayCandle, 'day_candles', columns)
 
-    def find_all(self,
-                 codes: List[str] = None,
-                 begin: date = None,
-                 end: date = None) -> List[DayCandle]:
+    def find_all_in(self,
+                    codes: List[str] = None,
+                    begin: date = None,
+                    end: date = None) -> List[DayCandle]:
         if begin and end:
             assert end >= begin, 'The end must be later than the begin, or equals'
 
@@ -57,11 +60,19 @@ class DayCandlesTable(AbstractDynamicTable):
             )
         ).all()
 
+    def find_all_at(self, codes: List[str], at: date) -> List[DayCandle]:
+        return self.query().filter(
+            and_(
+                self.proxy.code.in_(codes) if codes else True,
+                self.proxy.date == at,
+            )
+        ).all()
+
     def find(self, code: str, at: date) -> DayCandle:
         return self.query().filter_by(code=code, date=at).first()
 
 
-class MinuteCandlesTable(AbstractDynamicTable):
+class MinuteCandlesTable(AbstractDynamicTable[MinuteCandle]):
 
     def __init__(
             self,

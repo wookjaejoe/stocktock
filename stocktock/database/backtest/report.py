@@ -4,15 +4,26 @@ __author__ = 'wookjae.jo'
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+from datetime import timedelta, date
 
 from indexes import InterestIndexes
-from .backtest import *
-from .common import *
+from .backtest import AbcBacktest, BacktestEvent, BuyEvent, SellEvent, DailyLog
+from .common import get_fl_map, get_name
+import os
+import pickle
+from typing import *
+import logging
+import json
+import jsons
+
+
+def date_to_str(d: date):
+    return d.strftime('%Y-%m-%d')
 
 
 class XlsxExporter:
 
-    def __init__(self, backtest: Backtest, target_path):
+    def __init__(self, backtest: AbcBacktest, target_path):
         self.backtest = backtest
         self.workbook = openpyxl.Workbook()
         self.target_path = target_path
@@ -74,15 +85,14 @@ class XlsxExporter:
             sheet.column_dimensions[get_column_letter(i + 1)].width = column_width
 
     def export(self):
+        logging.info('Exporting report...')
         for sheet_name in self.workbook.sheetnames:
             self.workbook.remove(self.workbook[sheet_name])
-
-        indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
 
         def total_eval(_daily_log: DailyLog):
             return _daily_log.deposit + _daily_log.holding_eval
 
-        ########## ranking ##########
+        logging.info('Making ranking sheet...')
         events_by_code: [str, List[BacktestEvent]] = {}
         for event in self.backtest.events:
             if event.code not in events_by_code:
@@ -91,28 +101,34 @@ class XlsxExporter:
             events_by_code.get(event.code).append(event)
 
         revenues_by_code = {}
+        revenue_rates_by_code = {}
         for code in events_by_code:
             events: List[BacktestEvent] = events_by_code.get(code)
             revenue = 0
+            seed = 0
             for event in events:
-                if event.type == BacktestEventType.BUY:
-                    revenue -= event.price * event.count
-                elif event.type == BacktestEventType.SELL:
-                    revenue += event.price * event.count
+                order_total = event.price * event.quantity
+                if isinstance(event, BuyEvent):
+                    revenue -= order_total
+                    seed += order_total
+                elif isinstance(event, SellEvent):
+                    revenue += order_total
                 else:
                     RuntimeError('WTF')
 
             revenues_by_code.update({code: revenue})
+            revenue_rates_by_code.update({code: revenue / seed * 100})
 
         rows = []
         fl_map = get_fl_map(list(revenues_by_code.keys()), self.backtest.begin, self.backtest.end)
         for code in revenues_by_code:
-            revenue = revenues_by_code.get(code)
             first, last = fl_map.get(code)
-            revenue_rate = round(revenue / self.backtest.limit_buy_amount * 100, 2)
+            revenue = round(revenues_by_code.get(code), 2)
+            revenue_rate = round(revenue_rates_by_code.get(code), 2)
             margin_rate = round((last - first) / first * 100, 2)
             row = [
                 code, get_name(code),
+                revenue,
                 revenue_rate,
                 first,
                 last,
@@ -123,24 +139,27 @@ class XlsxExporter:
 
         # 수익금으로 정렬
         rows.sort(key=lambda x: x[-1], reverse=True)
-        self.create_table_sheet('ranking', headers=['종목코드', '종목명', '수익율(%)', '시작가', '종료가', '변동율(%)', '수익율-변동율(%)'],
-                                rows=rows, index=2)
+        self.create_table_sheet(
+            'ranking',
+            headers=['종목코드', '종목명', '수익금', '수익율(%)', '시작가', '종료가', '변동율(%)', '수익율-변동율(%)'],
+            rows=rows, index=2
+        )
 
-        ########## events ##########
+        logging.info('Making events sheet...')
         headers = [
             '일시', '구분', '종목코드', '종목명', '가격',
             '수량', '주문총액', '비고',
             '수익율(%)'
         ]
         rows = [[
-            evt.when, evt.type.name, evt.code, get_name(evt.code), evt.price,
-            evt.count, evt.price * evt.count, evt.description,
-            round((evt.price - evt.bought_event.price) / evt.bought_event.price * 100, 2)
-            if isinstance(evt, BacktestSellEvent) else ''
+            evt.when, evt.__class__.__name__, evt.code, get_name(evt.code), evt.price,
+            evt.quantity, evt.price * evt.quantity, evt.comment,
+            round(evt.revenue_percent, 2)
+            if isinstance(evt, SellEvent) else ''
         ] for evt in self.backtest.events]
         self.create_table_sheet('events', headers=headers, rows=rows, index=2)
 
-        ########## daily ##########
+        logging.info('Making daily sheet...')
         headers = [
             '날짜', '예수금', '보유 종목 평가금액', '총 평가금액',
             '전일대비(%)', '비고',
@@ -158,37 +177,44 @@ class XlsxExporter:
             else:
                 margin = (total_eval(dl) - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100
 
-            try:
-                kospi = indexes.kospi.data.get(dl.date).close
-                kosdaq = indexes.kosdaq.data.get(dl.date).close
-                krx_300 = indexes.krx_300.data.get(dl.date).close
+            # try:
+            #     indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
+            #     kospi = indexes.kospi.data.get(dl.date).close
+            #     kosdaq = indexes.kosdaq.data.get(dl.date).close
+            #     krx_300 = indexes.krx_300.data.get(dl.date).close
+            #
+            #     kospi_bf = indexes.kospi.data.get(dl.date - timedelta(days=1)).close
+            #     kosdaq_bf = indexes.kosdaq.data.get(dl.date - timedelta(days=1)).close
+            #     krx_300_bf = indexes.krx_300.data.get(dl.date - timedelta(days=1)).close
+            #     rows.append([
+            #         dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
+            #         round(margin, 2), dl.comment,
+            #         kospi, round((kospi - kospi_bf) / kospi_bf * 100, 2),
+            #         kosdaq, round((kosdaq - kosdaq_bf) / kosdaq_bf * 100, 2),
+            #         krx_300, round((krx_300 - krx_300_bf) / krx_300_bf * 100, 1)
+            #     ])
+            # except:
+            #     rows.append([
+            #         dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
+            #         round(margin, 2), dl.comment
+            #     ])
 
-                kospi_bf = indexes.kospi.data.get(dl.date - timedelta(days=1)).close
-                kosdaq_bf = indexes.kosdaq.data.get(dl.date - timedelta(days=1)).close
-                krx_300_bf = indexes.krx_300.data.get(dl.date - timedelta(days=1)).close
-
-                rows.append([
-                    dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
-                    round(margin, 2), dl.description,
-                    kospi, round((kospi - kospi_bf) / kospi_bf * 100, 2),
-                    kosdaq, round((kosdaq - kosdaq_bf) / kosdaq_bf * 100, 2),
-                    krx_300, round((krx_300 - krx_300_bf) / krx_300_bf * 100, 1)
-                ])
-            except:
-                pass
+            rows.append([
+                dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
+                round(margin, 2), dl.comment
+            ])
 
         self.create_table_sheet('daily', headers=headers, rows=rows, index=1)
 
         fl_map = get_fl_map(
-            codes=[stock.code for stock in stocks],
+            codes=self.backtest.available_codes,
             begin=self.backtest.begin,
             end=self.backtest.end
         )
 
-        ########## summary ##########
+        logging.info('Making summary sheet...')
         headers = [
             '시작일', '종료일', '구동시간(sec)', '최초 예수금',
-            '익절라인(%)', '손절라인(%)', '매매 수수료(%)', '매도 세금(%)',
             '수익금',
             '수익율(%)',
             '취급 종목 평균 변동율(%)',
@@ -200,28 +226,39 @@ class XlsxExporter:
             first, last = fl_map.get(code)
             margin_percentage_list.append(((last - first) / first) * 100)
 
-        kospi_f = list(indexes.kospi.data.values())[0].close
-        kospi_l = list(indexes.kospi.data.values())[-1].close
-        kospi_margin = (kospi_l - kospi_f) / kospi_f * 100
-
-        kosdaq_f = list(indexes.kosdaq.data.values())[0].close
-        kosdaq_l = list(indexes.kosdaq.data.values())[-1].close
-        kosdaq_margin = (kosdaq_l - kosdaq_f) / kospi_f * 100
-
-        krx_300_f = list(indexes.krx_300.data.values())[0].close
-        krx_300_l = list(indexes.krx_300.data.values())[-1].close
-        krx_300_margin = (krx_300_l - krx_300_f) / krx_300_f * 100
-
         final_eval = total_eval(self.backtest.daily_logs[-1])
-        rows = [[
+        row = [
             self.backtest.begin, self.backtest.end, (self.backtest.finish_time - self.backtest.start_time).seconds,
             self.backtest.initial_deposit,
-            self.backtest.earn_line, self.backtest.stop_line, self.backtest.fee_percent, self.backtest.tax_percent,
             round(final_eval - self.backtest.initial_deposit),
             round((final_eval - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
             round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
-            round(kospi_margin, 2), round(kosdaq_margin, 2), round(krx_300_margin, 2)
-        ]]
+        ]
+
+        # try:
+        #     indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
+        #     kospi_f = list(indexes.kospi.data.values())[0].close
+        #     kospi_l = list(indexes.kospi.data.values())[-1].close
+        #     kospi_margin = (kospi_l - kospi_f) / kospi_f * 100
+        #
+        #     kosdaq_f = list(indexes.kosdaq.data.values())[0].close
+        #     kosdaq_l = list(indexes.kosdaq.data.values())[-1].close
+        #     kosdaq_margin = (kosdaq_l - kosdaq_f) / kospi_f * 100
+        #
+        #     krx_300_f = list(indexes.krx_300.data.values())[0].close
+        #     krx_300_l = list(indexes.krx_300.data.values())[-1].close
+        #     krx_300_margin = (krx_300_l - krx_300_f) / krx_300_f * 100
+        #
+        #     row += [
+        #         round(kospi_margin, 2), round(kosdaq_margin, 2), round(krx_300_margin, 2)
+        #     ]
+        # except:
+        #     pass
+
+        rows = [row]
         self.create_table_sheet('summary', headers=headers, rows=rows, index=0)
         logging.info(f'Saving workbook in {self.target_path}')
         self.workbook.save(self.target_path)
+
+        with open(os.path.join(os.path.dirname(self.target_path), '.json'), 'w', encoding='utf-8') as f:
+            json.dump(jsons.dumps(self.backtest), f, indent=2)

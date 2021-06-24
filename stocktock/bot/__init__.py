@@ -236,11 +236,11 @@ class Bot(abc.ABC):
             detail = list(stocks.get_details([code]))[0]
             order_price = detail.price
 
-        order_total = order_price * holding.count
-        holding_total = holding.price * holding.count
+        order_total = order_price * holding.quantity
+        holding_total = holding.price * holding.quantity
 
         try:
-            traders.sell(code=code, price=order_price, count=holding.count)
+            traders.sell(code=code, price=order_price, count=holding.quantity)
             self.wallet.delete(code)
             OrderRecord(
                 what=what,
@@ -248,7 +248,7 @@ class Bot(abc.ABC):
                 code=code,
                 name=stocks.get_name(code),
                 order_price=order_price,
-                order_count=holding.count,
+                order_count=holding.quantity,
                 total=order_total,
                 earning_price=order_total - holding_total,
                 earning_rate=calc.earnings_ratio(holding.price, order_price)
