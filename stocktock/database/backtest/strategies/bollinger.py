@@ -1,3 +1,4 @@
+import logging
 import statistics
 from dataclasses import dataclass
 from datetime import date
@@ -7,7 +8,6 @@ from typing import *
 from common.model import CandlesGroupByCode
 from database.charts import DayCandlesTable, MinuteCandlesTable
 from ..backtest import AbcBacktest
-import logging
 
 
 @dataclass
@@ -83,7 +83,7 @@ class BackTest(AbcBacktest):
 
         day_candles_by_code = CandlesGroupByCode(day_candles)
 
-        whitelist = [code for code in self.account.holdings]
+        whitelist = []
         for code in day_candles_by_code.codes():
             day_candles = day_candles_by_code.get(code)
 
@@ -101,7 +101,9 @@ class BackTest(AbcBacktest):
 
         logging.info(f'{len(whitelist)} codes in whitelist.')
         with MinuteCandlesTable(d=today) as minute_candles_table:
-            minute_candles = minute_candles_table.find_all(codes=whitelist)
+            minute_candles = minute_candles_table.find_all(codes=whitelist + [code for code in self.account.holdings])
+
+        logging.info(f'{len(self.account.holdings)} codes in holding.')
 
         minute_candles.sort(key=lambda mc: datetime.combine(mc.date, mc.time))
         for minute_candle in minute_candles:
@@ -123,22 +125,23 @@ class BackTest(AbcBacktest):
                 if revenue_rate <= self.stop_line:
                     self._try_sell(when=now, code=code, price=price, amount_rate=1,
                                    comment=f'손절 {self.stop_line}')
-                    return
+                    continue
 
                 if revenue_rate >= self.earning_line_min:
+                    if revenue_rate >= self.earning_line_max:
+                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
+                                       comment=f'전량 익절 {self.earning_line_max}%+')
+                        continue
+                    if (price - holding.max) / holding.max * 100 < -abs(self.trailing_stop_rate):  # 트레일링 스탑
+                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
+                                       comment=f'트레일링 스탑: 고점({holding.max}) 대비 {(price - holding.max) / holding.max * 100}%')
+                        continue
                     if revenue_rate >= self.earning_line and not hasattr(holding, 'mark'):
                         holding.mark = True
                         self._try_sell(when=now, code=code, price=price, amount_rate=1 / 2,
                                        comment=f'절반 익절 {self.earning_line}%+')
-                        return
-                    elif revenue_rate >= self.earning_line_max:
-                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                                       comment=f'전량 익절 {self.earning_line_max}%+')
-                        return
-                    elif (price - holding.max) / holding.max * 100 < -abs(self.trailing_stop_rate):  # 트레일링 스탑
-                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                                       comment=f'트레일링 스탑: 고점({holding.max}) 대비 {(price - holding.max) / holding.max * 100}%')
-                        return
+                        continue
+
             else:
                 bollinger = BollingerBand.of(
                     prices=[dc.close for dc in day_candles_by_code.get(code)] + [price],
