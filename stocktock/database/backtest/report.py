@@ -116,8 +116,9 @@ class XlsxExporter:
                 else:
                     RuntimeError('WTF')
 
-            revenues_by_code.update({code: revenue})
-            revenue_rates_by_code.update({code: revenue / seed * 100})
+            if seed:
+                revenues_by_code.update({code: revenue})
+                revenue_rates_by_code.update({code: revenue / seed * 100})
 
         rows = []
         fl_map = get_fl_map(list(revenues_by_code.keys()), self.backtest.begin, self.backtest.end)
