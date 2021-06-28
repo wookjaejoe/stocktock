@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import *
 
 import sqlalchemy
 from sqlalchemy import Column, String
@@ -39,6 +40,6 @@ class StockTable(AbstractDynamicTable[Stock]):
         return self.query().filter_by(code=code).first()
 
 
-def all_stocks():
+def all_stocks() -> List[Stock]:
     with StockTable() as stock_table:
         return stock_table.all()
