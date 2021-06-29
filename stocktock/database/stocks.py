@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from enum import Enum
 from typing import *
 
@@ -19,6 +20,8 @@ class Stock:
     code: str
     name: str
     market: Market
+    industry: Optional[str]
+    since: Optional[date]
 
 
 url = config.database.get_url('bases')

@@ -13,7 +13,7 @@ from creon import stocks, metrics
 basedir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(basedir, 'stocktock'))
 
-from bot import Simulator_2
+from trading import Simulator_2
 from utils.slack import Message
 
 
