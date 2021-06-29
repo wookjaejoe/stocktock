@@ -4,7 +4,7 @@ from enum import Enum
 from typing import *
 
 import sqlalchemy
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Date
 
 from config import config
 from .common import AbstractDynamicTable, StringEnum
@@ -34,7 +34,9 @@ class StockTable(AbstractDynamicTable[Stock]):
         columns = [
             Column('code', String, primary_key=True),
             Column('name', String, nullable=False),
-            Column('market', StringEnum(Market), nullable=False)
+            Column('market', StringEnum(Market), nullable=False),
+            Column('industry', String),
+            Column('since', Date)
         ]
 
         super().__init__(engine, Stock, 'stocks', columns)

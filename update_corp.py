@@ -35,5 +35,5 @@ def update_stocks():
 
         stock_table.session.commit()
 
-
-update_stocks()
+if __name__ == '__main__':
+    update_stocks()

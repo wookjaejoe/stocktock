@@ -23,7 +23,7 @@ engine = create_engine(url, client_encoding='utf-8')
 
 
 class FundamentalTable(AbstractDynamicTable[Fundamental]):
-    def __init__(self, code: str, create_if_not_exists: bool):
+    def __init__(self, code: str, create_if_not_exists: bool = False):
         columns = [
             Column('date', Date, primary_key=True),
             Column('bps', Float),
