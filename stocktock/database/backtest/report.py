@@ -1,20 +1,21 @@
 # noinspection SpellCheckingInspection
 __author__ = 'wookjae.jo'
 
+import json
+import logging
+import os
+import pickle
+from datetime import date
+from typing import *
+
+import jsons
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
-from datetime import timedelta, date
 
 from indexes import InterestIndexes
 from .backtest import AbcBacktest, BacktestEvent, BuyEvent, SellEvent, DailyLog
 from .common import get_fl_map, get_name
-import os
-import pickle
-from typing import *
-import logging
-import json
-import jsons
 
 
 def date_to_str(d: date):
@@ -170,6 +171,7 @@ class XlsxExporter:
         ]
 
         rows = []
+        indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
         for i in range(len(self.backtest.daily_logs)):
             dl = self.backtest.daily_logs[i]
             if i > 0:
@@ -178,31 +180,40 @@ class XlsxExporter:
             else:
                 margin = (total_eval(dl) - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100
 
-            # try:
-            #     indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
-            #     kospi = indexes.kospi.data.get(dl.date).close
-            #     kosdaq = indexes.kosdaq.data.get(dl.date).close
-            #     krx_300 = indexes.krx_300.data.get(dl.date).close
-            #
-            #     kospi_bf = indexes.kospi.data.get(dl.date - timedelta(days=1)).close
-            #     kosdaq_bf = indexes.kosdaq.data.get(dl.date - timedelta(days=1)).close
-            #     krx_300_bf = indexes.krx_300.data.get(dl.date - timedelta(days=1)).close
-            #     rows.append([
-            #         dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
-            #         round(margin, 2), dl.comment,
-            #         kospi, round((kospi - kospi_bf) / kospi_bf * 100, 2),
-            #         kosdaq, round((kosdaq - kosdaq_bf) / kosdaq_bf * 100, 2),
-            #         krx_300, round((krx_300 - krx_300_bf) / krx_300_bf * 100, 1)
-            #     ])
-            # except:
-            #     rows.append([
-            #         dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
-            #         round(margin, 2), dl.comment
-            #     ])
+            try:
+                # noinspection PyUnboundLocalVariable
+                kospi_prev, kosdaq_prev, krx_300_prev = kospi, kosdaq, krx_300_prev
+            except:
+                kospi_prev, kosdaq_prev, krx_300_prev = 0, 0, 0
+
+            kospi = indexes.kospi.data.get(dl.date).close
+            kosdaq = indexes.kosdaq.data.get(dl.date).close
+            krx_300 = indexes.krx_300.data.get(dl.date).close
+
+            if not kospi_prev:
+                kospi_prev = kospi
+
+            if not kosdaq_prev:
+                kosdaq_prev = kosdaq
+
+            if not krx_300_prev:
+                krx_300_prev = krx_300
+
+            try:
+                kospi_margin_rate = round((kospi - kospi_prev) / kospi_prev * 100, 2)
+                kosdaq_margin_rate = round((kosdaq - kosdaq_prev) / kosdaq_prev * 100, 2)
+                krx_300_margin_rate = round((krx_300 - krx_300_prev) / krx_300_prev * 100, 1)
+            except:
+                kospi_margin_rate = 0
+                kosdaq_margin_rate = 0
+                krx_300_margin_rate = 0
 
             rows.append([
                 dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
-                round(margin, 2), dl.comment
+                round(margin, 2), dl.comment,
+                kospi, kospi_margin_rate,
+                kosdaq, kosdaq_margin_rate,
+                krx_300, krx_300_margin_rate
             ])
 
         self.create_table_sheet('daily', headers=headers, rows=rows, index=1)
@@ -215,7 +226,7 @@ class XlsxExporter:
 
         logging.info('Making summary sheet...')
         headers = [
-            '시작일', '종료일', '구동시간(sec)', '최초 예수금',
+            '시작일', '종료일', '구동시간(sec)', '최초 예수금', '취급종목 개수',
             '수익금',
             '수익율(%)',
             '취급 종목 평균 변동율(%)',
@@ -230,31 +241,28 @@ class XlsxExporter:
         final_eval = total_eval(self.backtest.daily_logs[-1])
         row = [
             self.backtest.begin, self.backtest.end, (self.backtest.finish_time - self.backtest.start_time).seconds,
-            self.backtest.initial_deposit,
+            self.backtest.initial_deposit, len(self.backtest.available_codes),
             round(final_eval - self.backtest.initial_deposit),
             round((final_eval - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
             round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
         ]
 
-        # try:
-        #     indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
-        #     kospi_f = list(indexes.kospi.data.values())[0].close
-        #     kospi_l = list(indexes.kospi.data.values())[-1].close
-        #     kospi_margin = (kospi_l - kospi_f) / kospi_f * 100
-        #
-        #     kosdaq_f = list(indexes.kosdaq.data.values())[0].close
-        #     kosdaq_l = list(indexes.kosdaq.data.values())[-1].close
-        #     kosdaq_margin = (kosdaq_l - kosdaq_f) / kospi_f * 100
-        #
-        #     krx_300_f = list(indexes.krx_300.data.values())[0].close
-        #     krx_300_l = list(indexes.krx_300.data.values())[-1].close
-        #     krx_300_margin = (krx_300_l - krx_300_f) / krx_300_f * 100
-        #
-        #     row += [
-        #         round(kospi_margin, 2), round(kosdaq_margin, 2), round(krx_300_margin, 2)
-        #     ]
-        # except:
-        #     pass
+        indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
+        kospi_f = list(indexes.kospi.data.values())[0].close
+        kospi_l = list(indexes.kospi.data.values())[-1].close
+        kospi_margin_rate = (kospi_l - kospi_f) / kospi_f * 100
+
+        kosdaq_f = list(indexes.kosdaq.data.values())[0].close
+        kosdaq_l = list(indexes.kosdaq.data.values())[-1].close
+        kosdaq_margin_rate = (kosdaq_l - kosdaq_f) / kospi_f * 100
+
+        krx_300_f = list(indexes.krx_300.data.values())[0].close
+        krx_300_l = list(indexes.krx_300.data.values())[-1].close
+        krx_300_margin_rate = (krx_300_l - krx_300_f) / krx_300_f * 100
+
+        row += [
+            round(kospi_margin_rate, 2), round(kosdaq_margin_rate, 2), round(krx_300_margin_rate, 2)
+        ]
 
         rows = [row]
         self.create_table_sheet('summary', headers=headers, rows=rows, index=0)
