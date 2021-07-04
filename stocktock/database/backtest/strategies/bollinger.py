@@ -125,7 +125,8 @@ class BackTest(AbcBacktest):
                 )
                 a = bb.mid - bb.lower
                 b = bb.lower - mc.close
-                return a / b
+
+                return 1 if b == 0 else a / b
 
             minute_candles.sort(key=sort_by, reverse=True)
 

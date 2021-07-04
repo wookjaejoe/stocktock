@@ -15,7 +15,7 @@ log.init()
 
 def main():
     end = date(2021, 6, 25)
-    begin = end - timedelta(days=365 * 2)
+    begin = end - timedelta(days=365 * 1)
     backtest = BlgBackTest(
         available_codes=kospi_n_codes(begin, 500),
         begin=begin,
