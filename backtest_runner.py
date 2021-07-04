@@ -7,7 +7,7 @@ from datetime import datetime
 
 from database.backtest.report import XlsxExporter
 from database.backtest.strategies.bollinger import BackTest as BlgBackTest
-from kospi_200 import kospi_200_codes
+from krx import kospi_n_codes
 from utils import log
 
 log.init()
@@ -17,14 +17,14 @@ def main():
     end = date(2021, 6, 25)
     begin = end - timedelta(days=365 * 2)
     backtest = BlgBackTest(
-        available_codes=kospi_200_codes(),
+        available_codes=kospi_n_codes(begin, 500),
         begin=begin,
         end=end,
         initial_deposit=1_0000_0000,
         once_buy_amount=1000_0000,
         earning_line_min=5,
         earning_line=10,
-        earning_line_max=10,
+        earning_line_max=15,
         stop_line=-10,
         trailing_stop_rate=3
     )

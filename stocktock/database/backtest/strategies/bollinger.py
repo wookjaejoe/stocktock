@@ -27,8 +27,8 @@ class BollingerBand:
         ma = sum(prices) / size
 
         return BollingerBand(
-            upper=ma + (2 * statistics.stdev(prices)),
-            lower=ma - (2 * statistics.stdev(prices)),
+            upper=ma + (2 * statistics.pstdev(prices)),
+            lower=ma - (2 * statistics.pstdev(prices)),
             mid=ma
         )
 
@@ -105,6 +105,7 @@ class BackTest(AbcBacktest):
 
         logging.info(f'{len(self.account.holdings)} codes in holding.')
 
+        blacklist = []
         minute_candles.sort(key=lambda mc: datetime.combine(mc.date, mc.time))
         for minute_candle in minute_candles:
             now = minute_candle.datetime()
@@ -125,6 +126,7 @@ class BackTest(AbcBacktest):
                 if revenue_rate <= self.stop_line:
                     self._try_sell(when=now, code=code, price=price, amount_rate=1,
                                    comment=f'손절 {self.stop_line}')
+                    blacklist.append(code)
                     continue
 
                 if revenue_rate >= self.earning_line_min:
@@ -143,8 +145,11 @@ class BackTest(AbcBacktest):
                         continue
 
             else:
+                if code in blacklist:
+                    continue
+
                 bollinger = BollingerBand.of(
-                    prices=[dc.close for dc in day_candles_by_code.get(code)] + [price],
+                    prices=[dc.close for dc in day_candles_by_code.get(code)[:-1]] + [price],
                     size=self.BOLLINGER_SIZE
                 )
 
