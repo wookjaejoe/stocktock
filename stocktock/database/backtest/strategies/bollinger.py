@@ -158,12 +158,18 @@ class BackTest(AbcBacktest):
 
                         continue
 
-                    # if revenue_rate <= self.stop_line:
-                    #     self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                    #                    comment=f'손절 {self.stop_line}')
-                    #     blacklist.append(code)
-                    #     continue
-                    #
+                    if revenue_rate <= self.stop_line:
+                        self._try_buy(
+                            when=now, code=code,
+                            price=minute_candle.close,
+                            amount=self.once_buy_amount,
+                            comment=f'평단 대비 {revenue_rate} 추가 매수'
+                        )
+                        # self._try_sell(when=now, code=code, price=price, amount_rate=1,
+                        #                comment=f'손절 {self.stop_line}')
+                        blacklist.append(code)
+                        continue
+
                     # if revenue_rate >= self.earning_line_min:
                     #     if revenue_rate >= self.earning_line_max:
                     #         self._try_sell(when=now, code=code, price=price, amount_rate=1,

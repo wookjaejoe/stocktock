@@ -37,7 +37,7 @@ class VirtualAccount:
 
         if self.has(code):
             holding = self.holdings.get(code)
-            total = holding.quantity * holding.avg_price + quantity * price
+            total = holding.total() + quantity * price
             total_quantity = holding.quantity + quantity
             holding.avg_price = total / total_quantity
             holding.quantity += quantity
@@ -48,7 +48,7 @@ class VirtualAccount:
                 avg_price=price
             )
 
-        self.deposit -= holding.total()
+        self.deposit -= quantity * price
         self.holdings.update({code: holding})
         return holding
 
