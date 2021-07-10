@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from typing import *
 from common.model import CandlesGroupByCode
+from krx import is_business_day
 
 
 @dataclass
@@ -59,12 +60,10 @@ class AbcBacktest(abc.ABC):
 
     def __init__(
             self,
-            available_codes: List[str],  # 취급 종목 코드
             begin: date,
             end: date,
             initial_deposit: int,
     ):
-        self.available_codes = available_codes
         self.begin = begin
         self.end = end
         self.initial_deposit = initial_deposit
@@ -153,14 +152,13 @@ class AbcBacktest(abc.ABC):
 
     def start(self):
         self.start_time = datetime.now()
-        with database.charts.DayCandlesTable() as day_candles_table:
-            for d in [self.begin + timedelta(days=i) for i in range((self.end - self.begin).days + 1)]:
-                if not day_candles_table.find_all_at(codes=self.available_codes, at=d):
-                    continue
+        for d in [self.begin + timedelta(days=i) for i in range((self.end - self.begin).days + 1)]:
+            if not is_business_day(d):
+                continue
 
-                logging.info(f'Backtest at {d}')
-                self.run(d)
-                self.daily_logs.append(self._evaluate(d))
+            logging.info(f'Backtest at {d}')
+            self.run(d)
+            self.daily_logs.append(self._evaluate(d))
 
         # 백테스트 종료 모든 보유 종목 매도
         with database.charts.DayCandlesTable() as day_candles_table:

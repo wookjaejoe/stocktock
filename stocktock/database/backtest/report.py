@@ -218,18 +218,10 @@ class XlsxExporter:
 
         self.create_table_sheet('daily', headers=headers, rows=rows, index=1)
 
-        fl_map = get_fl_map(
-            codes=self.backtest.available_codes,
-            begin=self.backtest.begin,
-            end=self.backtest.end
-        )
-
         logging.info('Making summary sheet...')
         headers = [
-            '시작일', '종료일', '구동시간(sec)', '최초 예수금', '취급종목 개수',
+            '시작일', '종료일', '구동시간(sec)', '최초 예수금',
             '수익금',
-            '수익율(%)',
-            '취급 종목 평균 변동율(%)',
             '코스피 증감율(%)', '코스닥 증감율(%)', 'KRX 300 증감율(%)'
         ]
 
@@ -238,10 +230,9 @@ class XlsxExporter:
             first, last = fl_map.get(code)
             margin_percentage_list.append(((last - first) / first) * 100)
 
-        final_eval = total_eval(self.backtest.daily_logs[-1])  # fixme
         row = [
             self.backtest.begin, self.backtest.end, (self.backtest.finish_time - self.backtest.start_time).seconds,
-            self.backtest.initial_deposit, len(self.backtest.available_codes),
+            self.backtest.initial_deposit,
             round(self.backtest.account.deposit - self.backtest.initial_deposit),
             round((self.backtest.account.deposit - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
             round(sum(margin_percentage_list) / len(margin_percentage_list), 2),

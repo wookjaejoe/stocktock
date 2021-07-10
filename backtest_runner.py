@@ -15,17 +15,16 @@ log.init()
 
 def main():
     end = date(2021, 6, 25)
-    begin = end - timedelta(days=365 * 2)
+    begin = end - timedelta(days=365 * 1)
     backtest = BlgBackTest(
-        available_codes=kospi_n_codes(begin, 1),
         begin=begin,
         end=end,
-        initial_deposit=10_0000_0000,
-        once_buy_amount=100_0000,
+        initial_deposit=1000_0000_0000,
+        once_buy_amount=1000_0000,
         earning_line_min=5,
         earning_line=10,
         earning_line_max=15,
-        stop_line=-5,
+        stop_line=-10,
         trailing_stop_rate=3
     )
 
