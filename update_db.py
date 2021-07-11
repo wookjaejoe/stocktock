@@ -1,6 +1,5 @@
 import logging
 from datetime import date, timedelta, datetime
-from multiprocessing.pool import ThreadPool
 
 import creon.charts
 import creon.stocks
@@ -47,7 +46,7 @@ def update_stocks():
 
 def update_day_candles(code: str, begin: date, end: date):
     with database.charts.DayCandlesTable() as day_candles_table:
-        candles = day_candles_table.find_all_at(codes=[code])
+        candles = day_candles_table.find_all_in(codes=[code])
         creon_candles = creon.charts.request_by_term(
             code=code,
             chart_type=creon.charts.ChartType.DAY,
@@ -142,8 +141,8 @@ def main():
             logging.warning(f'Failed to update candles for {code}', exc_info=e)
 
     logging.info('Updating candles...')
-    with ThreadPool(2) as pool:
-        pool.map(update, [stock.code for stock in stocks])
+    for stock in stocks:
+        update(stock.code)
 
 
 if __name__ == '__main__':
