@@ -122,7 +122,7 @@ def update_minute_candles(code: str, begin: date, end: date):
 
 
 def main():
-    begin = date.today() - timedelta(days=8)
+    begin = date.today() - timedelta(days=30)
     end = date.today()
 
     def date_to_str(d: date):
