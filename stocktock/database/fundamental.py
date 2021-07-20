@@ -1,10 +1,15 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import create_engine, Date, Float, Column
+from pykrx import stock as pykrx_stock
+from sqlalchemy import create_engine, Date, Float, Column, BigInteger
 
 from config import config
 from .common import AbstractDynamicTable
+import numpy as np
+from psycopg2.extensions import register_adapter, AsIs
+import psycopg2
+psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
 
 @dataclass
@@ -18,7 +23,13 @@ class Fundamental:
     dps: float
 
 
-url = config.database.get_url('funds')
+@dataclass
+class Capital:
+    date: date
+    cap: int
+
+
+url = config.database.get_url('fundamentals')
 engine = create_engine(url, client_encoding='utf-8')
 
 
@@ -34,37 +45,53 @@ class FundamentalTable(AbstractDynamicTable[Fundamental]):
             Column('dps', Float),
         ]
 
-        super().__init__(engine, Fundamental, f'funds_{code}', columns, create_if_not_exists=create_if_not_exists)
+        super().__init__(engine, Fundamental, f'fundamentals_{code}', columns,
+                         create_if_not_exists=create_if_not_exists)
 
 
-def _update(code: str, fromdate: date, todate: date):
-    def __date_to_str(d: date):
-        return d.strftime('%Y%m%d')
+class CapitalTable(AbstractDynamicTable[Capital]):
+    def __init__(self, code: str, create_if_not_exists: bool = False):
+        columns = [
+            Column('date', Date, primary_key=True),
+            Column('cap', BigInteger),
+        ]
 
-    from pykrx import stock as pykrx_stock
-    try:
-        df = pykrx_stock.get_market_fundamental_by_date(
-            fromdate=__date_to_str(fromdate),
-            todate=__date_to_str(todate),
-            ticker=code
-        )
-    except:
-        return
+        super().__init__(engine, Capital, f'capitals_{code}', columns,
+                         create_if_not_exists=create_if_not_exists)
+
+
+def _date_to_str(d: date):
+    return d.strftime('%Y%m%d')
+
+
+def _update_fundamentals(code: str, fromdate: date, todate: date):
+    df = pykrx_stock.get_market_fundamental_by_date(
+        fromdate=_date_to_str(fromdate),
+        todate=_date_to_str(todate),
+        ticker=code
+    )
 
     funds = []
     for idx, row in df.iterrows():
-        # noinspection PyUnresolvedReferences
-        funds.append(
-            Fundamental(
-                date=idx.date(),
-                bps=row.get('BPS'),
-                per=row.get('PER'),
-                pbr=row.get('PBR'),
-                eps=row.get('EPS'),
-                div=row.get('DIV'),
-                dps=row.get('DPS'),
+        all_nan = True
+        for v in row:
+            if v:
+                all_nan = False
+                break
+
+        if not all_nan:
+            # noinspection PyUnresolvedReferences
+            funds.append(
+                Fundamental(
+                    date=idx.date(),
+                    bps=row.get('BPS'),
+                    per=row.get('PER'),
+                    pbr=row.get('PBR'),
+                    eps=row.get('EPS'),
+                    div=row.get('DIV'),
+                    dps=row.get('DPS'),
+                )
             )
-        )
 
     with FundamentalTable(code=code, create_if_not_exists=True) as fund_table:
         whitelist = []
@@ -77,8 +104,68 @@ def _update(code: str, fromdate: date, todate: date):
         fund_table.insert_all(whitelist)
 
 
+def _update_capitals(code: str, fromdate: date, todate: date):
+    df = pykrx_stock.get_market_cap_by_date(
+        fromdate=_date_to_str(fromdate),
+        todate=_date_to_str(todate),
+        ticker=code
+    )
+
+    capitals = []
+    for idx, row in df.iterrows():
+        all_nan = True
+        for v in row:
+            if v:
+                all_nan = False
+                break
+
+        if not all_nan:
+            # noinspection PyUnresolvedReferences
+            capitals.append(
+                Capital(
+                    date=idx.date(),
+                    cap=row.get('시가총액'),
+                )
+            )
+
+    with CapitalTable(code=code, create_if_not_exists=True) as cap_table:
+        whitelist = []
+        exists_rows = cap_table.all()
+        for cap in capitals:
+            if cap.date not in [row.date for row in exists_rows]:
+                whitelist.append(cap)
+
+        print(f'Inserting {len(whitelist)} records...')
+        cap_table.insert_all(whitelist)
+
+
+def find_all_codes(fromdate: date, todate: date):
+    tempd = fromdate
+    codes = {}
+    while True:
+        codes.update({code: None for code in pykrx_stock.get_market_ticker_list(_date_to_str(tempd))})
+
+        if tempd > todate:
+            break
+        tempd += timedelta(days=365)
+
+    for code in codes:
+        name = pykrx_stock.get_market_ticker_name(code)
+        if isinstance(name, str):
+            codes.update({code: name})
+
+    return codes
+
+
 def udpate_all():
-    from .stocks import all_stocks
-    for stock in all_stocks():
-        print(stock)
-        _update(stock.code, fromdate=date.today() - timedelta(days=365 * 5), todate=date.today())
+    fromdate = date(1996, 1, 1)
+    todate = date.today()
+    codes = find_all_codes(fromdate, todate)
+
+    total = [code for code, name in codes.items() if name]
+    num = 0
+    for code in [code for code, name in codes.items() if name]:
+        num += 1
+        print(f'{num}/{len(total)}')
+        _update_fundamentals(code, fromdate=fromdate, todate=todate)
+        _update_capitals(code, fromdate=fromdate, todate=todate)
