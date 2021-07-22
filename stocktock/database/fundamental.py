@@ -1,14 +1,15 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+import numpy as np
+import psycopg2
+from psycopg2.extensions import register_adapter
 from pykrx import stock as pykrx_stock
-from sqlalchemy import create_engine, Date, Float, Column, BigInteger
+from sqlalchemy import create_engine, Date, Float, Column, BigInteger, String
 
 from config import config
 from .common import AbstractDynamicTable
-import numpy as np
-from psycopg2.extensions import register_adapter, AsIs
-import psycopg2
+
 psycopg2.extensions.register_adapter(np.int64, psycopg2._psycopg.AsIs)
 
 
@@ -25,6 +26,7 @@ class Fundamental:
 
 @dataclass
 class Capital:
+    code: str
     date: date
     cap: int
 
@@ -57,6 +59,18 @@ class CapitalTable(AbstractDynamicTable[Capital]):
         ]
 
         super().__init__(engine, Capital, f'capitals_{code}', columns,
+                         create_if_not_exists=create_if_not_exists)
+
+
+class AllCapitalTable(AbstractDynamicTable[Capital]):
+    def __init__(self, create_if_not_exists: bool = False):
+        columns = [
+            Column('code', String, primary_key=True),
+            Column('date', Date, primary_key=True),
+            Column('cap', BigInteger),
+        ]
+
+        super().__init__(engine, Capital, f'capitals', columns,
                          create_if_not_exists=create_if_not_exists)
 
 
@@ -155,6 +169,25 @@ def find_all_codes(fromdate: date, todate: date):
             codes.update({code: name})
 
     return codes
+
+
+def integrate_capitals():
+    # fromdate = date(1996, 1, 1)
+    # todate = date.today()
+    # codes = find_all_codes(fromdate, todate)
+    codes = []
+    with AllCapitalTable(create_if_not_exists=True) as all_capital_table:
+        table_names = all_capital_table.inspector.get_table_names()
+        for table_name in table_names:
+            if table_name.startswith('capitals_'):
+                code = table_name.split('_')[1]
+                codes.append(code)
+
+        for code in codes:
+            with CapitalTable(code=code) as capital_table:
+                all_capital_table.insert_all(
+                    [Capital(code=code, date=capital.date, cap=capital.cap) for capital in capital_table.all()]
+                )
 
 
 def udpate_all():
