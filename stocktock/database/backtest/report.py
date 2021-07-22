@@ -234,8 +234,8 @@ class XlsxExporter:
             self.backtest.begin, self.backtest.end, (self.backtest.finish_time - self.backtest.start_time).seconds,
             self.backtest.initial_deposit,
             round(self.backtest.account.deposit - self.backtest.initial_deposit),
-            round((self.backtest.account.deposit - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
-            round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
+            # round((self.backtest.account.deposit - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
+            # round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
         ]
 
         indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)

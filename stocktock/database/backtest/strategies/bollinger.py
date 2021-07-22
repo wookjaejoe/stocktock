@@ -42,19 +42,6 @@ def is_overlap(bound_1: Tuple[float, float], bound_2: Tuple[float, float]):
 
 
 class BackTest(AbcBacktest):
-    """
-    볼린저 밴드 기반 매매 전략:
-    - 코스피 200 종목에 대해
-    - 볼린저 밴드:
-        - MID: 20MA
-        - UPPER/LOWER: 20MA +- 표준편차 * 2
-    - 매수: 현재가 < LOWER
-    - 매도: 공통 매도 조건, 손절 -10%
-        - 트레일링 스탑: 스탑 기준을 고점 대비 -3%
-        - 최소 익절 조건: 5%
-        - 분할: 10%, 15%
-    - 종목 당 전체 시드의 5%씩 투자
-    """
 
     BOLLINGER_SIZE = 20
 
@@ -74,7 +61,7 @@ class BackTest(AbcBacktest):
     def run(self, today: date):
         with DayCandlesTable() as day_candles_table:
             day_candles = day_candles_table.find_all_in(
-                codes=kospi_n_codes(today, 300),
+                codes=kospi_n_codes(today, 300) + list(self.account.holdings.keys()),
                 begin=today - timedelta(days=self.BOLLINGER_SIZE * 2),
                 end=today
             )
@@ -147,17 +134,17 @@ class BackTest(AbcBacktest):
 
                     if revenue_rate <= self.stop_line:
                         # 추가매수
-                        # if code not in blacklist:
-                        #     self._try_buy(
-                        #         when=now, code=code,
-                        #         price=minute_candle.close,
-                        #         amount=self.once_buy_amount,
-                        #         comment=f'추가매수(평단: {holding.avg_price}, 현재가 평단 대비: {revenue_rate})'
-                        #     )
+                        if code not in blacklist:
+                            self._try_buy(
+                                when=now, code=code,
+                                price=minute_candle.close,
+                                amount=self.once_buy_amount,
+                                comment=f'추가매수(평단: {holding.avg_price}, 현재가 평단 대비: {revenue_rate})'
+                            )
 
                         # 손절
-                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                                       comment=f'손절 {self.stop_line}')
+                        # self._try_sell(when=now, code=code, price=price, amount_rate=1,
+                        #                comment=f'손절 {self.stop_line}')
                         blacklist.append(code)
                         continue
 

@@ -7,7 +7,6 @@ from datetime import datetime
 
 from database.backtest.report import XlsxExporter
 from database.backtest.strategies.bollinger import BackTest as BlgBackTest
-from krx import kospi_n_codes
 from utils import log
 
 log.init()
