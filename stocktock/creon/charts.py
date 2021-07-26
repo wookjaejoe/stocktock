@@ -31,7 +31,7 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date, pe
     @limit_safe(req_type=ReqType.NON_TRADE)
     def _req(_begin: date, _end: date):
         if chart_type == ChartType.MINUTE:
-            assert _end - _begin <= timedelta(days=8), f'The period limit exceeded.'
+            assert _end - _begin <= timedelta(days=8 * period), f'The period limit exceeded.'
 
         chart = stockchart()
         chart.SetInputValue(0, code)  # 종목코드
@@ -86,7 +86,7 @@ def request_by_term(code: str, chart_type: ChartType, begin: date, end: date, pe
         result = []
         b = begin
         while True:
-            e = b + timedelta(days=8)
+            e = b + timedelta(days=8 * period)
 
             if e > end:
                 e = end

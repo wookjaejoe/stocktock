@@ -127,7 +127,7 @@ def update_minute_candles(code: str, begin: date, end: date, period):
 
 
 def main():
-    begin = date.today() - timedelta(days=30)
+    begin = date.today() - timedelta(days=365 * 10)
     end = date.today()
 
     def date_to_str(d: date):
@@ -148,7 +148,7 @@ def main():
 
     logging.info('Updating candles...')
     for stock in stocks:
-        print(f'[{stocks.index(stock) + 1}/{len(stocks)}]', stock.code)
+        logging.info(f'[{stocks.index(stock) + 1}/{len(stocks)}] {stock.code}')
         update(stock.code)
 
 
