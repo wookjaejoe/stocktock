@@ -77,13 +77,14 @@ def update_day_candles(code: str, begin: date, end: date):
         day_candles_table.insert_all(inserts)
 
 
-def update_minute_candles(code: str, begin: date, end: date):
+def update_minute_candles(code: str, begin: date, end: date, period):
     if begin > end:
         return
 
     creon_candles = creon.charts.request_by_term(
         code=code,
         chart_type=creon.charts.ChartType.MINUTE,
+        period=period,
         begin=begin,
         end=end
     )
@@ -100,7 +101,11 @@ def update_minute_candles(code: str, begin: date, end: date):
         if not creon_candles:
             continue
 
-        with database.charts.MinuteCandlesTable(d, True) as minute_candles_table:
+        with database.charts.MinuteCandlesTable(
+                d,
+                time_unit=f'{period}m',
+                create_if_not_exists=True
+        ) as minute_candles_table:
             exist_candles = minute_candles_table.find_all([code])
             exist_datetimes = [datetime.combine(candle.date, candle.time) for candle in exist_candles]
 
@@ -135,13 +140,15 @@ def main():
 
     def update(code: str):
         try:
-            update_day_candles(code, begin, end)
-            update_minute_candles(code, begin, end)
+            # update_day_candles(code, begin, end)
+            # update_minute_candles(code, begin, end, period=1)
+            update_minute_candles(code, begin, end, period=10)
         except creon.stocks.StockNotFound as e:
             logging.warning(f'Failed to update candles for {code}', exc_info=e)
 
     logging.info('Updating candles...')
     for stock in stocks:
+        print(f'[{stocks.index(stock) + 1}/{len(stocks)}]', stock.code)
         update(stock.code)
 
 

@@ -77,6 +77,7 @@ class MinuteCandlesTable(AbstractDynamicTable[MinuteCandle]):
     def __init__(
             self,
             d: date,
+            time_unit='1m',
             create_if_not_exists: bool = False
     ):
         columns = [
@@ -90,10 +91,19 @@ class MinuteCandlesTable(AbstractDynamicTable[MinuteCandle]):
             Column('vol', Integer, nullable=False)
         ]
 
+        if time_unit == '1m':
+            # minute_candles_%Y%m%d
+            table_name = 'minute_candles' + d.strftime('%Y%m%d'),
+        else:
+            # minute_candles_{unit}_%Y%m%d
+            table_name = f'minute_candles_{time_unit}'
+
+        table_name += '_' + d.strftime('%Y%m%d')
+
         super().__init__(
             engine,
             MinuteCandle,
-            'minute_candles_' + d.strftime('%Y%m%d'),
+            table_name,
             columns,
             create_if_not_exists=create_if_not_exists
         )
