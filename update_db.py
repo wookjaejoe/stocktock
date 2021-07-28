@@ -122,13 +122,13 @@ def update_minute_candles(code: str, begin: date, end: date, period):
                 datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]
 
             if new_candles:
-                print(code, d.strftime('%Y%m%d'))
                 minute_candles_table.insert_all(new_candles)
+                logging.info(f'Inserting {len(new_candles)} rows...')
 
 
 def main():
-    begin = date.today() - timedelta(days=365 * 10)
-    end = date.today()
+    begin = date(2018, 1, 1)
+    end = date(2019, 12, 31)
 
     def date_to_str(d: date):
         return d.strftime('%Y-%m-%d')
@@ -142,7 +142,7 @@ def main():
         try:
             # update_day_candles(code, begin, end)
             # update_minute_candles(code, begin, end, period=1)
-            update_minute_candles(code, begin, end, period=10)
+            update_minute_candles(code, begin, end, period=5)
         except creon.stocks.StockNotFound as e:
             logging.warning(f'Failed to update candles for {code}', exc_info=e)
 

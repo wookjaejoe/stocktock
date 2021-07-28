@@ -6,7 +6,7 @@ from datetime import date, time, datetime
 from typing import *
 
 import sqlalchemy
-from sqlalchemy import Column, Date, Time, Integer, and_, String
+from sqlalchemy import Column, Date, Time, Integer, and_, String, BigInteger
 
 from common.model import Candle
 from config import config
@@ -40,7 +40,7 @@ class DayCandlesTable(AbstractDynamicTable[DayCandle]):
             Column('close', Integer, nullable=False),
             Column('low', Integer, nullable=False),
             Column('high', Integer, nullable=False),
-            Column('vol', Integer, nullable=False)
+            Column('vol', BigInteger, nullable=False)
         ]
 
         super().__init__(engine, DayCandle, 'day_candles', columns)
@@ -88,7 +88,7 @@ class MinuteCandlesTable(AbstractDynamicTable[MinuteCandle]):
             Column('close', Integer, nullable=False),
             Column('low', Integer, nullable=False),
             Column('high', Integer, nullable=False),
-            Column('vol', Integer, nullable=False)
+            Column('vol', BigInteger, nullable=False)
         ]
 
         if time_unit == '1m':

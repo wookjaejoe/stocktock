@@ -88,7 +88,7 @@ class BackTest(AbcBacktest):
                 whitelist.append(code)
 
         logging.info(f'{len(whitelist)} codes in whitelist.')
-        with MinuteCandlesTable(d=today) as minute_candles_table:
+        with MinuteCandlesTable(d=today, time_unit='5m') as minute_candles_table:
             minute_candles = minute_candles_table.find_all(codes=whitelist + [code for code in self.account.holdings])
 
         logging.info(f'{len(self.account.holdings)} codes in holding.')
@@ -124,13 +124,11 @@ class BackTest(AbcBacktest):
                     revenue = price - holding.avg_price
                     revenue_rate = revenue / holding.avg_price * 100
 
-                    # 밴드 중단 매도
-                    # if price > bollinger.mid:
-                    #     self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                    #                    comment=f'현재가 밴드 중단')
-                    #     if revenue_rate < 0:
-                    #         blacklist.append(code)
-                    #     continue
+                    if price >= bollinger.upper:
+                        self._try_sell(when=now, code=code, price=price, amount_rate=1,
+                                       comment=f'현재가 밴드 상단 돌파')
+                        blacklist.append(code)
+                        continue
 
                     if revenue_rate <= self.stop_line:
                         # 추가매수
@@ -143,8 +141,6 @@ class BackTest(AbcBacktest):
                             )
 
                         # 손절
-                        # self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                        #                comment=f'손절 {self.stop_line}')
                         blacklist.append(code)
                         continue
 
@@ -154,15 +150,6 @@ class BackTest(AbcBacktest):
                             self._try_sell(when=now, code=code, price=price, amount_rate=1,
                                            comment=f'전량 익절 {self.earning_line_max}%+')
                             continue
-                        # if (price - holding.max) / holding.max * 100 < -abs(self.trailing_stop_rate):  # 트레일링 스탑
-                        #     self._try_sell(when=now, code=code, price=price, amount_rate=1,
-                        #                    comment=f'트레일링 스탑: 고점({holding.max}) 대비 {(price - holding.max) / holding.max * 100}%')
-                        #     continue
-                        # if revenue_rate >= self.earning_line and not hasattr(holding, 'mark'):
-                        #     holding.mark = True
-                        #     self._try_sell(when=now, code=code, price=price, amount_rate=1 / 2,
-                        #                    comment=f'절반 익절 {self.earning_line}%+')
-                        #     continue
 
                 else:
                     # 미보유 - 매수 시그널 확인
