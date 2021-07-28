@@ -3,23 +3,23 @@ from __future__ import annotations
 
 __author__ = 'wookjae.jo'
 
+import abc
 import json
 import logging
 import os
 import pickle
+from dataclasses import dataclass
+from datetime import datetime, time
 from datetime import timedelta, date
+from typing import *
 
 import jsons
 
 import database.charts
 import database.metrics
 import database.stocks
-from common.virtual_account import VirtualAccount, NotEnoughDepositException
-import abc
-from dataclasses import dataclass
-from datetime import datetime, time
-from typing import *
 from common.model import CandlesGroupByCode
+from common.virtual_account import VirtualAccount, NotEnoughDepositException
 from krx import is_business_day
 
 
@@ -54,6 +54,9 @@ class DailyLog:
     holding_count: int  # 보유 종목 개수
     comment: str  # 추가 정보
 
+    def total(self):
+        return self.deposit + self.holding_eval
+
 
 # noinspection PyMethodMayBeStatic
 class AbcBacktest(abc.ABC):
@@ -74,6 +77,8 @@ class AbcBacktest(abc.ABC):
 
         self.start_time: Optional[datetime] = None
         self.finish_time: Optional[datetime] = None
+
+        self.comment = ''
 
     def _try_buy(
             self,
@@ -194,3 +199,8 @@ class AbcBacktest(abc.ABC):
             pickle.dump(self, f)
 
         return target_dir
+
+    @classmethod
+    def load(cls, pickle_file: str) -> AbcBacktest:
+        with open(pickle_file, 'rb') as f:
+            return pickle.load(f)

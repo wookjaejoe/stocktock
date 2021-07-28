@@ -163,10 +163,10 @@ class XlsxExporter:
 
         logging.info('Making daily sheet...')
         headers = [
-            '날짜', '예수금', '보유 종목 평가금액', '총 평가금액',
+            '날짜', '예수금', '보유 종목 평가금액', '보유 종목 개수', '총 평가금액',
             '전일대비(%)', '비고',
             '코스피', '코스피 전일대비(%)',
-            '코스닥', '코스피 전일대비(%)',
+            '코스닥', '코스닥 전일대비(%)',
             'KRX 300', 'KRX 300(%)'
         ]
 
@@ -209,7 +209,7 @@ class XlsxExporter:
                 krx_300_margin_rate = 0
 
             rows.append([
-                dl.date, round(dl.deposit), round(dl.holding_eval), round(total_eval(dl)),
+                dl.date, round(dl.deposit), round(dl.holding_eval), dl.holding_count, round(total_eval(dl)),
                 round(margin, 2), dl.comment,
                 kospi, kospi_margin_rate,
                 kosdaq, kosdaq_margin_rate,
@@ -221,8 +221,9 @@ class XlsxExporter:
         logging.info('Making summary sheet...')
         headers = [
             '시작일', '종료일', '구동시간(sec)', '최초 예수금',
-            '수익금',
-            '코스피 증감율(%)', '코스닥 증감율(%)', 'KRX 300 증감율(%)'
+            '수익금', '수익율(%)', '순환율(%)',
+            '코스피 증감율(%)', '코스닥 증감율(%)', 'KRX 300 증감율(%)',
+            'Comment'
         ]
 
         margin_percentage_list = []
@@ -230,12 +231,19 @@ class XlsxExporter:
             first, last = fl_map.get(code)
             margin_percentage_list.append(((last - first) / first) * 100)
 
+        sum_of_cirulation_rate = 0
+        for dl in self.backtest.daily_logs:
+            sum_of_cirulation_rate += dl.holding_eval / dl.total()
+
+        ciculation_percent = round(sum_of_cirulation_rate / len(self.backtest.daily_logs) * 100, 2)
+        earnings = self.backtest.account.deposit - self.backtest.initial_deposit
+
         row = [
             self.backtest.begin, self.backtest.end, (self.backtest.finish_time - self.backtest.start_time).seconds,
             self.backtest.initial_deposit,
-            round(self.backtest.account.deposit - self.backtest.initial_deposit),
-            # round((self.backtest.account.deposit - self.backtest.initial_deposit) / self.backtest.initial_deposit * 100, 2),
-            # round(sum(margin_percentage_list) / len(margin_percentage_list), 2),
+            earnings,  # 수익금
+            round(earnings / self.backtest.initial_deposit * 100, 2),  # 수익율
+            ciculation_percent  # 순환율
         ]
 
         indexes = InterestIndexes.load(fromdate=self.backtest.begin, todate=self.backtest.end)
@@ -252,9 +260,10 @@ class XlsxExporter:
         krx_300_margin_rate = (krx_300_l - krx_300_f) / krx_300_f * 100
 
         row += [
-            round(kospi_margin_rate, 2), round(kosdaq_margin_rate, 2), round(krx_300_margin_rate, 2)
+            round(kospi_margin_rate, 2), round(kosdaq_margin_rate, 2), round(krx_300_margin_rate, 2),
         ]
 
+        row.append(self.backtest.comment)
         rows = [row]
         self.create_table_sheet('summary', headers=headers, rows=rows, index=0)
         logging.info(f'Saving workbook in {self.target_path}')
