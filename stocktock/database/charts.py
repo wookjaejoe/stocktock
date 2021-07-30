@@ -93,7 +93,7 @@ class MinuteCandlesTable(AbstractDynamicTable[MinuteCandle]):
 
         if time_unit == '1m':
             # minute_candles_%Y%m%d
-            table_name = 'minute_candles' + d.strftime('%Y%m%d'),
+            table_name = 'minute_candles'
         else:
             # minute_candles_{unit}_%Y%m%d
             table_name = f'minute_candles_{time_unit}'
