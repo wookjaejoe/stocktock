@@ -1,6 +1,7 @@
-from pykrx import stock
 from datetime import date
 from typing import *
+
+from pykrx import stock
 
 
 def __date_to_str(d: date):
@@ -16,3 +17,13 @@ def is_business_day(at: date):
     business_days = [date(ts.year, ts.month, ts.day) for ts in
                      stock.get_previous_business_days(year=at.year, month=at.month)]
     return at in business_days
+
+
+name_cache = {}
+
+
+def get_name(code: str):
+    if code not in name_cache:
+        name_cache.update({code: stock.get_market_ticker_name(code)})
+
+    return name_cache.get(code)

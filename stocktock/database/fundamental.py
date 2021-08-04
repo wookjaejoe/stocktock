@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import *
 
 import numpy as np
 import psycopg2
 from psycopg2.extensions import register_adapter
 from pykrx import stock as pykrx_stock
-from sqlalchemy import create_engine, Date, Float, Column, BigInteger, String
+from sqlalchemy import create_engine, Date, Float, Column, BigInteger, String, and_
 
 from config import config
 from .common import AbstractDynamicTable
@@ -72,6 +73,17 @@ class AllCapitalTable(AbstractDynamicTable[Capital]):
 
         super().__init__(engine, Capital, f'capitals', columns,
                          create_if_not_exists=create_if_not_exists)
+
+    def find_all_at(self, at: date) -> List[Capital]:
+        return self.query().filter(self.proxy.date == at).all()
+
+    def find_all_in(self, begin: date, end: date) -> List[Capital]:
+        return self.query().filter(
+            and_(
+                begin <= self.proxy.date,
+                self.proxy.date <= end,
+            )
+        ).all()
 
 
 def _date_to_str(d: date):
