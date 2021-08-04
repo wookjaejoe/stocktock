@@ -77,11 +77,12 @@ class AllCapitalTable(AbstractDynamicTable[Capital]):
     def find_all_at(self, at: date) -> List[Capital]:
         return self.query().filter(self.proxy.date == at).all()
 
-    def find_all_in(self, begin: date, end: date) -> List[Capital]:
+    def find_all_in(self, begin: date, end: date, codes=None) -> List[Capital]:
         return self.query().filter(
             and_(
                 begin <= self.proxy.date,
                 self.proxy.date <= end,
+                True if codes is None else self.proxy.code.in_(codes)
             )
         ).all()
 

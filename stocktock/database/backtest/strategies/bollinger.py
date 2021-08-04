@@ -42,13 +42,12 @@ def is_overlap(bound_1: Tuple[float, float], bound_2: Tuple[float, float]):
 
 
 class BackTest(AbcBacktest):
-
     BOLLINGER_SIZE = 20
 
     def __init__(
             self, begin: date, end: date, initial_deposit: int, once_buy_amount: int,
             earning_line_min: float, earning_line: float, earning_line_max: float, stop_line: float,
-            trailing_stop_rate: float
+            trailing_stop_rate: float, blacklist: list
     ):
         super().__init__(begin, end, initial_deposit)
         self.once_buy_amount = once_buy_amount
@@ -57,11 +56,14 @@ class BackTest(AbcBacktest):
         self.earning_line_max = earning_line_max
         self.stop_line = stop_line
         self.trailing_stop_rate = trailing_stop_rate
+        self.blacklist = blacklist
 
     def run(self, today: date):
         with DayCandlesTable() as day_candles_table:
+            codes = kospi_n_codes(today, 300) + list(self.account.holdings.keys())
+            codes = [code for code in codes if code not in self.blacklist]
             day_candles = day_candles_table.find_all_in(
-                codes=kospi_n_codes(today, 300) + list(self.account.holdings.keys()),
+                codes=codes,
                 begin=today - timedelta(days=self.BOLLINGER_SIZE * 2),
                 end=today
             )
@@ -149,6 +151,7 @@ class BackTest(AbcBacktest):
                         if revenue_rate >= self.earning_line_max:
                             self._try_sell(when=now, code=code, price=price, amount_rate=1,
                                            comment=f'전량 익절 {self.earning_line_max}%+')
+                            blacklist.append(code)
                             continue
 
                 else:
@@ -158,5 +161,5 @@ class BackTest(AbcBacktest):
                             when=now, code=code,
                             price=minute_candle.close,
                             amount=self.once_buy_amount,
-                            comment='현재가 밴드 하단'
+                            comment=f'현재가 밴드 하단({bollinger})'
                         )

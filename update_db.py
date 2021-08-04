@@ -122,8 +122,8 @@ def update_minute_candles(code: str, begin: date, end: date, period):
                 datetime.combine(creon_candle.date, creon_candle.time) not in exist_datetimes]
 
             if new_candles:
-                minute_candles_table.insert_all(new_candles)
                 logging.info(f'Inserting {len(new_candles)} rows...')
+                minute_candles_table.insert_all(new_candles)
 
 
 def main():

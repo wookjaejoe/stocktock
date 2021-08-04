@@ -167,7 +167,7 @@ class XlsxExporter:
             '전일대비(%)', '비고',
             '코스피', '코스피 전일대비(%)',
             '코스닥', '코스닥 전일대비(%)',
-            'KRX 300', 'KRX 300(%)'
+            'KRX 300', 'KRX 300 전일대비(%)'
         ]
 
         rows = []
@@ -182,7 +182,7 @@ class XlsxExporter:
 
             try:
                 # noinspection PyUnboundLocalVariable
-                kospi_prev, kosdaq_prev, krx_300_prev = kospi, kosdaq, krx_300_prev
+                kospi_prev, kosdaq_prev, krx_300_prev = kospi, kosdaq, krx_300
             except:
                 kospi_prev, kosdaq_prev, krx_300_prev = 0, 0, 0
 
@@ -202,7 +202,7 @@ class XlsxExporter:
             try:
                 kospi_margin_rate = round((kospi - kospi_prev) / kospi_prev * 100, 2)
                 kosdaq_margin_rate = round((kosdaq - kosdaq_prev) / kosdaq_prev * 100, 2)
-                krx_300_margin_rate = round((krx_300 - krx_300_prev) / krx_300_prev * 100, 1)
+                krx_300_margin_rate = round((krx_300 - krx_300_prev) / krx_300_prev * 100, 2)
             except:
                 kospi_margin_rate = 0
                 kosdaq_margin_rate = 0
