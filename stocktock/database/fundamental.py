@@ -6,7 +6,7 @@ import numpy as np
 import psycopg2
 from psycopg2.extensions import register_adapter
 from pykrx import stock as pykrx_stock
-from sqlalchemy import create_engine, Date, Float, Column, BigInteger, String, and_
+from sqlalchemy import create_engine, Date, Float, Column, BigInteger, String, and_, extract
 
 from config import config
 from .common import AbstractDynamicTable
@@ -86,6 +86,14 @@ class AllCapitalTable(AbstractDynamicTable[Capital]):
             )
         ).all()
 
+    def find_all_by_year_and_month(self, year: int, month: int):
+        return self.query().filter(
+            and_(
+                extract('year', self.proxy.date) == year,
+                extract('month', self.proxy.date) == month,
+            )
+        ).all()
+
 
 def _date_to_str(d: date):
     return d.strftime('%Y%m%d')
@@ -150,12 +158,13 @@ def _update_capitals(code: str, fromdate: date, todate: date):
             # noinspection PyUnresolvedReferences
             capitals.append(
                 Capital(
+                    code=code,
                     date=idx.date(),
                     cap=row.get('시가총액'),
                 )
             )
 
-    with CapitalTable(code=code, create_if_not_exists=True) as cap_table:
+    with AllCapitalTable() as cap_table:
         whitelist = []
         exists_rows = cap_table.all()
         for cap in capitals:
@@ -204,7 +213,7 @@ def integrate_capitals():
 
 
 def udpate_all():
-    fromdate = date(1996, 1, 1)
+    fromdate = date(2021, 7, 15)
     todate = date.today()
     codes = find_all_codes(fromdate, todate)
 
