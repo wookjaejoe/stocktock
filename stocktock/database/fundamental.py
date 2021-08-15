@@ -179,7 +179,7 @@ def find_all_codes(fromdate: date, todate: date):
     tempd = fromdate
     codes = {}
     while True:
-        codes.update({code: None for code in pykrx_stock.get_market_ticker_list(_date_to_str(tempd))})
+        codes.update({code: None for code in pykrx_stock.get_market_ticker_list(_date_to_str(tempd), market='ALL')})
 
         if tempd > todate:
             break
@@ -194,9 +194,6 @@ def find_all_codes(fromdate: date, todate: date):
 
 
 def integrate_capitals():
-    # fromdate = date(1996, 1, 1)
-    # todate = date.today()
-    # codes = find_all_codes(fromdate, todate)
     codes = []
     with AllCapitalTable(create_if_not_exists=True) as all_capital_table:
         table_names = all_capital_table.inspector.get_table_names()
