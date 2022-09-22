@@ -209,7 +209,7 @@ def integrate_capitals():
                 )
 
 
-def udpate_all():
+def update_all():
     fromdate = date(2021, 7, 15)
     todate = date.today()
     codes = find_all_codes(fromdate, todate)

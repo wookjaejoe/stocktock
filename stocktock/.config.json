@@ -1,10 +1,10 @@
 {
   "database": {
     "scheme": "postgresql://",
-    "host": "218.147.138.41",
-    "port": "5432",
-    "pw": "hermes",
-    "user": "hermes"
+    "host": "",
+    "port": "",
+    "pw": "",
+    "user": ""
   },
   "creon": {
     "cert_pw": "",
