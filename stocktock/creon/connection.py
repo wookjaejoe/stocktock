@@ -12,6 +12,7 @@ import logging
 
 from .exceptions import CreonError
 from . import com
+import time
 
 CONFIG_PATH = os.path.join(Path.home(), '.creon.config')
 
@@ -81,6 +82,7 @@ class CreonConnector:
                 cls._disconnect()
                 logging.info('Killing CreonPlus...')
                 cls._kill_client()
+                time.sleep(10)
                 logging.info('Starting CreonPlus...')
                 cls._start_client()
                 cls.wait_connection()
@@ -90,7 +92,7 @@ class CreonConnector:
 
     @classmethod
     def wait_connection(cls, timeout=60):
-        for i in range(timeout):
+        for _ in range(timeout):
             if com.cybos().IsConnect:
                 return
 
